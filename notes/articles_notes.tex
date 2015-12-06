@@ -8,7 +8,7 @@
 \usepackage{amssymb,amsmath}
 \makeglossaries
 
-\newcommand{\fvar}{\alpha (n,i)}
+\newcommand{\fvar}{\f(n,i)}
 \newcommand{\pinit}{\pi (i)}
 \newcommand{\ptrans}{t(i,j)}
 \newcommand{\pemi}{e(x\mid i)}
@@ -105,38 +105,38 @@ P\{\textbf{x}\mid \Theta\} = \sum_{y}P\{\textbf{x},\textbf{y}\mid \Theta\}.
 Ceci est cependant très couteux en calcul puisqu'il existe $M^L$ séquences d'états possibles.
 \\
 \par
-Le \textit{forward algorithm} est un algorithme de programmation dynamique calculant efficacement $P\{\textbf{x}\mid \Theta\}$. Cet algorithme définit une \textit{forward variable} $\alpha (n,i) $ déterminant la probabilité d'observer la séquence partielle de symboles $x_1\dotsc x_n$ et d'arriver à l'état $i$ pour $y_n$, étant donné $\Theta$
+Le \textit{forward algorithm} est un algorithme de programmation dynamique calculant efficacement $P\{\textbf{x}\mid \Theta\}$. Cet algorithme définit une \textit{forward variable} $f(n,i) $ déterminant la probabilité d'observer la séquence partielle de symboles $x_1\dotsc x_n$ et d'arriver à l'état $i$ pour $y_n$, étant donné $\Theta$
 \begin{equation}
-\alpha (n,i) = P\{x_1\dotsc x_n,y_n=i\mid \Theta\}.
+f(n,i) = P\{x_1\dotsc x_n,y_n=i\mid \Theta\}.
 \end{equation}
-En $n=1$, $\alpha (1,i) = P\{x_1,i\mid \Theta\}$. Or cette probabilité d'observer $x_1$ avec $y_1 =i$ revient à joindre la probabilité d'émission de $x_1$ par $i$ et la probabilité initiale de l'état $i$. Ensuite, pour $n=2,\dotsc ,L$, afin de calculer la probabilité d'observer $x_1,\dotsc ,x_{n-1},x_{n}$ et d'arriver à l'état $i$, il suffit, pour chaque $j$ en $n-1$, de récupérer son $\alpha (n-1,j)$ associé (probabilité d'observer $x_1,\dotsc ,x_{n-1}$ et d'arriver à $j$) en y joignant la probabilité de transition $t(j,i)$ puisqu'on passe de $j$ à $i$ ainsi que le probabilité d'émission $e(x_{n}\mid i)$ étant donné qu'on observe $x_{n}$ avec $i$, et de tous les additionner. On en déduit la formule récursive
+En $n=1$, $f(1,i) = P\{x_1,i\mid \Theta\}$. Or cette probabilité d'observer $x_1$ avec $y_1 =i$ revient à joindre la probabilité d'émission de $x_1$ par $i$ et la probabilité initiale de l'état $i$. Ensuite, pour $n=2,\dotsc ,L$, afin de calculer la probabilité d'observer $x_1,\dotsc ,x_{n-1},x_{n}$ et d'arriver à l'état $i$, il suffit, pour chaque $j$ en $n-1$, de récupérer son $f(n-1,j)$ associé (probabilité d'observer $x_1,\dotsc ,x_{n-1}$ et d'arriver à $j$) en y joignant la probabilité de transition $t(j,i)$ puisqu'on passe de $j$ à $i$ ainsi que le probabilité d'émission $e(x_{n}\mid i)$ étant donné qu'on observe $x_{n}$ avec $i$, et de tous les additionner. On en déduit la formule récursive
 \begin{equation}
-\alpha (n,i) = \begin{cases}
+f(n,i) = \begin{cases}
 	\pinit e(x_1\mid i), & n=1.\\ 
-	\sum_{j=1}^{M}[\alpha(n-1,j)t(j,i)e(x_{n}\mid i)], & n=2,\dotsc ,L.
+	\sum_{j=1}^{M}[f(n-1,j)t(j,i)e(x_{n}\mid i)], & n=2,\dotsc ,L.
 \end{cases}
 \end{equation}
 On finit par trouver la probabilité d'observation de \textbf{x} en additionnant les probabilités d'observer $x_1,\dotsc x_L$ et d'arriver à chaque état $i$ 
 \begin{equation}
-P\{\textbf{x}\mid \Theta\} = \sum_{i=1}^{M}\alpha (L,i).
+P\{\textbf{x}\mid \Theta\} = \sum_{i=1}^{M}f(L,i).
 \end{equation}
 La complexité de cet algorithme est seulement $\mathcal{O}(LM^2)$.
 \\
 \par
 Les mêmes résultats peuvent être obtenus en utilisant un algorithme fonctionnant dans l'autre sens, appelé \textit{backward algorithm}. Cet algorithme définit une \textit{backward variable} donnant la probabilité d'observer la séquence de symbole $x_{n+1}\dotsc x_L$ après être arrivé à un état $i$ en $n$
 \begin{equation}
-\beta (n,i)=P\{x_{n+1}\dotsc x_L\mid y_n=i,\Theta\}.
+b(n,i)=P\{x_{n+1}\dotsc x_L\mid y_n=i,\Theta\}.
 \end{equation}
-Cette variable $\beta (n,i)$ peut être calculée récursivement comme suit
+Cette variable $b(n,i)$ peut être calculée récursivement comme suit
 \begin{equation}
-\beta (n,i) = \begin{cases}
+b(n,i) = \begin{cases}
 	1, & n=L.\\
-	\sum_{j=1}^{M}[t(i,j)e(x_{n+1}\mid j)\beta(n+1,j)], & n=L-1,L-2,\dotsc ,1.
+	\sum_{j=1}^{M}[t(i,j)e(x_{n+1}\mid j)b(n+1,j)], & n=L-1,L-2,\dotsc ,1.
 \end{cases}
 \end{equation}
 On obtient alors la probabilité d'observation de \textbf{x} 
 \begin{equation}
-P\{\textbf{x}\mid\Theta\} = \sum_{i=1}^{M}\beta (1,i)\pinit e(x_1 \mid i).
+P\{\textbf{x}\mid\Theta\} = \sum_{i=1}^{M}b(1,i)\pinit e(x_1 \mid i).
 \end{equation}
 \subsubsection{Problème de décodage}
 Étant donné une séquence de symbole \textbf{x} et un modèle $\Theta$, quelle est la séquence d'états \textbf{y} qui explique au mieux la séquence de symboles observés ? On recherche donc le chemin [d'états] optimal $\textbf{y}^*$ qui maximise la probabilité d'observation de la séquence de symbole \textbf{x}. Soit formellement
@@ -162,6 +162,11 @@ et on retrouve le chemin d'états optimal $\textbf{y}^*$ en remontant les récur
 \\
 Il est à noter que les probabilités peuvent devenir de très petits nombres \textit{float} pour de longues séquences, menant potentiellement à des problèmes pour la représentation machine. Ceci peut être résolu en changeant les probabilités en logarithmes de probabilités.
 \subsubsection{Problème d'entrainement}
-Soit un ensemble de séquences de symboles observés $\textbf{X}=\{\textbf{x}_1,\textbf{x}_2,\dotsc ,\textbf{x}_T\}$ qu'on souhaite représenter par un MMC. Comment peut-on choisir de manière raisonnable et adéquate les paramètres $\Theta = (\pinit,\ptrans,\pemi)$ du MMC en se basant sur ces observations ? Bien qu'il n'existe pas de manière optimale d'estimer les paramètres à partir d'un nombre limité de séquences finies de symboles, il est possible de trouver des paramètres maximisant localement la probabilité d'observation (\textit{Baum-Welch}, \textit{Monte Carlo EM}).
+Soit un ensemble de séquences de symboles observés $\textbf{X}=\{\textbf{x}_1,\textbf{x}_2,\dotsc ,\textbf{x}_T\}$ qu'on souhaite représenter par un MMC. Comment peut-on choisir de manière raisonnable et adéquate les paramètres $\Theta = (\pinit,\ptrans,\pemi)$ du MMC en se basant sur ces observations ? Bien qu'il n'existe pas de manière optimale d'estimer les paramètres à partir d'un nombre limité de séquences finies de symboles, il est possible de trouver des paramètres maximisant localement la probabilité d'observation (\textit{Baum-Welch}, \textit{stochastic EM}).
+
+\section{\textit{A linear memory algorithm for Baum-Welch training}}
+\subsection{Entrainement \textit{Baum-Welch}}
+Rappelons que le problème d'entrainement est de trouver un ensemble de paramètres $\Theta = (\pinit,\ptrans,\pemi)$ satisfaisant pour un MMC.
+L'algorithme Baum-Welch définit une procédure itérative dans laquelle les probabilités d'émission $\pemi$ et de transition $\ptrans$ dans l'itération $n+1$ sont mises au nombre de fois que chaque transition et émission est attendue à être utilisée lors de l'analyse de la séquence d'entrainement avec l'ensemble des probabilités d'émission et de transition dérivées dans l'itération précédente $n$.
 
 \end{document}
