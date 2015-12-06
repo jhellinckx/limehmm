@@ -13,6 +13,8 @@
 \newcommand{\ptrans}{t(i,j)}
 \newcommand{\pemi}{e(x\mid i)}
 
+
+
 \makeatletter
 \renewcommand{\@seccntformat}[1]{
   \ifcsname prefix@#1\endcsname
@@ -57,6 +59,9 @@
  }
 
 \begin{document}
+
+\renewcommand{\labelitemi}{$\bullet$}
+
 \maketitle
 \tableofcontents
 \glsaddall
@@ -168,5 +173,19 @@ Soit un ensemble de séquences de symboles observés $\textbf{X}=\{\textbf{x}_1,
 \subsection{Entrainement \textit{Baum-Welch}}
 Rappelons que le problème d'entrainement est de trouver un ensemble de paramètres $\Theta = (\pinit,\ptrans,\pemi)$ satisfaisant pour un MMC.
 L'algorithme Baum-Welch définit une procédure itérative dans laquelle les probabilités d'émission $\pemi$ et de transition $\ptrans$ dans l'itération $n+1$ sont mises au nombre de fois que chaque transition et émission est attendue à être utilisée lors de l'analyse de la séquence d'entrainement avec l'ensemble des probabilités d'émission et de transition dérivées dans l'itération précédente $n$.
+
+\section{\textit{Implementing EM and Viterbi algorithms for Hidden Markov Model in linear memory}}
+\subsection{Définition d'un MMC}
+Un MMC peut être décrit comme une machine à état fini stochastique pour laquelle chaque transition entre états cachés se termine par une émission de symbole. Un MMC peut être représenté par un graphe dirigé avec $N$ états où chaque état peut émettre soit un caractère discret, soit une valeur continue tirée depuis une fonction de densité de probabilité (\textit{PDF}). Les paramètres suivants décrivent l'implémentation conventionnelle d'un MMC :
+\begin{itemize}
+	\item Un ensemble d'états $S=\{S_1,\dotsc ,S_N\}$ avec $q_t$ l'état visité à l'instant $t$;
+	\item Un ensemble de fonctions de densité de probabilité $B = \{b_1(o),\dotsc ,b_N(o)\}$, décrivant les probabilités d'émission $b_j(o_t) = P(o_t \mid q_t = S_j)$ pour $1\leq j\leq N$, où $o_t$ est l'observation au temps $t$ de la séquence d'observations $O=\{O_1,\dotsc ,O_T\}$;
+	\item Une matrice de probabilités de transition [d'états] $A = \{a_{i, j}\}$ pour $1\lq i, j \leq N$, où $a_{i, j}=P(q_{t+1} = S_j \mid q_t = S_i)$;
+	\item Un vecteur de distributions initiales d'états $\Pi = \{\pi_1,\dotsc ,\pi_N\}$.
+\end{itemize}
+
+\section{\textit{Using hidden Markov models to analyze gene expression time course data}}
+\subsection{Problème de \textit{clustering}}
+
 
 \end{document}
