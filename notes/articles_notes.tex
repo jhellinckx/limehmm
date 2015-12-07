@@ -185,7 +185,27 @@ Un MMC peut être décrit comme une machine à état fini stochastique pour laqu
 \end{itemize}
 
 \section{\textit{Using hidden Markov models to analyze gene expression time course data}}
-\subsection{Problème de \textit{clustering}}
+\subsection{Définition formelle d'un problème de \textit{clustering}}
+Soit $n$ séquences $O^i$ pouvant être de longueur différente, avec un ensemble d'indices $ \mathcal{I} = \{1,2,\dotsc ,n\}$ et un entier fixé $K \ll n$. Calculer une partition $\mathcal{C} = (C_1,C_2,\dotsc ,C_K)$ de $\mathcal{I}$ et les MMCs $\lambda_1,\dotsc ,\lambda_K$ qui maximisent la fonction
+\begin{equation}
+f(\mathcal{C}) = \prod_{k=1}^{K}\prod_{i\in C_k} L(O^i \mid \lambda_k),
+\end{equation}
+où $L(O^i \mid \lambda_k)$ dénote la \textit{likelihood function}, la densité de probabilité de générer la séquence $O^i$ avec le modèle $\lambda_k : (O^i \mid \lambda_k) := P(O^i \mid \lambda_k)$.
+\subsection{Proposition de résolution}
+L'approche de la vraisemblance maximum (\textit{maximum likelihood}) pour résoudre un \textit{cluster problem} de MMC est proposée, étant donnée une collection $K$ initiale de MMCs $\lambda_1^0,\dotsc ,\lambda_K^0$.
+\begin{enumerate}
+	\item Itération $t\in \{1,2,\dotsc\} :$
+	\begin{itemize}
+		\item[(a)] Générer un nouveau partitionnement des séquences en assignant chaque séquence $O^i$ au modèle $k$ pour lequel la vraisemblance $L(O^i\mid \lambda_k^{t-1})$ est maximale. 
+		\item[(b)]
+	\end{itemize} Calculer les nouveaux paramètres $\lambda_1^t,\dotsc ,\lambda_K^t$ en utilisant un algorithme de réestimation avec leur paramètres précédents $\lambda_1^{t-1},\dotsc ,\lambda_K^{t-1}$ et leurs séquences assignées.
+	\item Stop si (1) l'amélioration de la fonction est plus petite qu'une limite donnée $\varepsilon$, (2) le groupement des séquences est inchangé ou (3) la limite d'iterations est atteinte.
+\end{enumerate}
 
-
+\subsection{Déterminer le nombre de \textit{clusters}}
+Déterminer le nombre de \textit{clusters} pose un problème particulier dans ce cas puisqu'il faut ici spécifier une \textit{collection} de modèles. Le nombre de modèles suit deux règles simples.
+\begin{enumerate}
+	\item Si un cluster contient très peu de profils, supprimer le cluster et réassigner les profiles aux cluster restants. 
+	\item Si un cluster contient trop de profils, le séparer en deux. Pour cela, on copie le modèle en changeant aléatoirement les paramètres des copies de façon uniforme et indépendante. 
+\end{enumerate}
 \end{document}
