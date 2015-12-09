@@ -1,6 +1,7 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[a4paper, 11pt]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[francais]{babel}
 \usepackage{fullpage}
 \usepackage{hyperref}
@@ -203,9 +204,20 @@ L'approche de la vraisemblance maximum (\textit{maximum likelihood}) pour résou
 \end{enumerate}
 
 \subsection{Déterminer le nombre de \textit{clusters}}
-Déterminer le nombre de \textit{clusters} pose un problème particulier dans ce cas puisqu'il faut ici spécifier une \textit{collection} de modèles. Le nombre de modèles suit deux règles simples.
+Déterminer le nombre de \textit{clusters} pose un problème particulier dans ce cas puisqu'il faut ici spécifier une \textit{collection} de modèles. Généralement on choisit des modèles initiaux en se basant sur des prototypes de comportement. Le nombre de modèles suit ensuite deux règles simples.
 \begin{enumerate}
-	\item Si un cluster contient très peu de profils, supprimer le cluster et réassigner les profiles aux cluster restants. 
+	\item Si un cluster contient très peu de profils, supprimer le cluster et réassigner les profils aux clusters restants. 
 	\item Si un cluster contient trop de profils, le séparer en deux. Pour cela, on copie le modèle en changeant aléatoirement les paramètres des copies de façon uniforme et indépendante. 
 \end{enumerate}
+
+\subsection{Données manquantes}
+On ajoute aux probabilités d'émission une valeur constante représentant la fréquence de données manquantes. Cette constante n'est pas modifiée par l'étape Baum-Welch dans l'algorithme de clustering. 
+
+\section{\textit{Robust inference of groups in gene expression time-courses using mixtures of HMMs}}
+
+\begin{itemize}
+	\item À quoi correspond $\alpha$ dans le calcul de $p(.\mid \Theta)$ p. 284 ? C'est le poids de chaque composante pdf, mais comment le calculer ?
+	\item Comment calculer la \textit{likelihood function} avec la \textit{mixture} pdf ? $L(O^i \mid \Theta)$ pour tout $i$ ?
+	\item Pour maximiser la \textit{likelihood function} l'EM algorithme est-il effectué seulement sur la \textit{mixture} pdf $p(.\mid\Theta)$ ?
+\end{itemize}
 \end{document}
