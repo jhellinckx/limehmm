@@ -1,0 +1,14 @@
+# Ignore latex/pdflatex aux files:
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.glo
+*.ist
+*.gz
+
+# Ignore objects files
+.o
