@@ -9,7 +9,6 @@
 template<typename S, typename O>
 class AbstractCHMM: public virtual AbstractHMM<S, O>{
 
-	
 };
 
 #endif

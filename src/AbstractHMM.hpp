@@ -54,6 +54,9 @@ public:
 
 	virtual std::size_t find_observation(const O obs) const = 0;
 
+	virtual std::size_t states() const { return _nStates };
+	virtual std::size_t observations() const = 0;
+
 
 };
 
@@ -81,7 +84,7 @@ template<typename S, typename O>
 float AbstractHMM<S, O>::trans_p(std::size_t i, std::size_t j) const{
 	if(!state_inBounds(i) || !state_inBounds(j))
 		throw std::out_of_range("State out of bounds");
-	return _transp[i*j];
+	return _transp[i*_nStates + j];
 }
 
 template<typename S, typename O>
@@ -89,7 +92,7 @@ float AbstractHMM<S, O>::trans_p_by_object(S firstState, S secondState) const{
 	std::size_t i,j;
 	if(i=find_state(firstState) == nullptr || j=find_state(secondState) == nullptr)
 		throw std::logic_error("State not found");
-	return _transp[i*j];
+	return _transp[i*_nStates + j];
 }
 
 #endif

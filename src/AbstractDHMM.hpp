@@ -41,7 +41,7 @@ public:
 			throw std::out_of_range("State index out of bounds");
 		if(!observation_inBounds(obs))
 			throw std::out_of_range("Observation index out of bounds");
-		return _emiP[state*obs];
+		return _emiP[state*states() + obs];
 	}
 	virtual float emi_p_by_object(S state, O obs) const{
 		std::size_t s,o;
@@ -49,7 +49,7 @@ public:
 			throw std::logic_error("State not found");
 		if(o=find_observation(obs) == nullptr)
 			throw std::logic_error("Observation not found");
-		return _emiP[s*o];
+		return _emiP[s*states() + o];
 	}
 
 	std::size_t find_observation(const O obs) const{
