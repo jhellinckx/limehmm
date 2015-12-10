@@ -11,23 +11,27 @@ private:
 	std::size_t _nStates;
 	float* _transP;
 
+	AbstractHMM(const std::initializer_list<S>& states);
 
 protected:
-	AbstractHMM(const std::initializer_list<S>& states);
 	AbstractHMM(
 		const std::initializer_list<S>&, 
 		const std::initializer_list<std::initializer_list<float>>&);
 
-	bool stateInBounds(const std::size_t& i) const{
-		return (i>0 && i<_nStates)
+	bool state_inBounds(const std::size_t i) const{
+		return (i>0 && i<_nStates);
 	}
 
-public:
+	virtual bool observation_inBounds(const std::size_t) const = 0;
 
-	float transp(std::size_t, std::size_t) const;
-	float transp(S, S) const;
-	float emip(std::size_t, std::size_t) const;
-	float emip(S, O) const;
+public:
+	/* Transition probabilities getters*/
+	float trans_p(std::size_t, std::size_t) const;
+	float trans_p(S, S) const;
+
+	/* Emission probabilities getters, defined in derived classes */
+	float emi_p(std::size_t, std::size_t) const = 0;
+	float emi_p(S, O) const = 0;
 
 	/* Decoding */
 	virtual void viterbi(const std::array<O>&) = 0;
@@ -39,7 +43,7 @@ public:
 
 	virtual ~AbstractHMM(){ delete[] _states; delete[] _transP; }
 
-	std::size_t find(const S state) const{
+	virtual std::size_t find_state(const S state) const{
 		for(std::size_t i=0;i<_nStates;++i){
 			if(_states[i] == state){
 				return i
@@ -48,6 +52,8 @@ public:
 		return nullptr;
 	}
 
+	virtual std::size_t find_observation(const O obs) const = 0;
+
 
 };
 
@@ -55,7 +61,7 @@ template<typename S, typename O>
 AbstractHMM<S, O>::AbstractHMM(const std::initializer_list<S>& states): 
 	_states(new S[states.size()]), _nStates(states.size()){
 		for(std::size_t i=0;i<states.size();++i){
-			if(find(states[i]) != nullptr)
+			if(find_state(states[i]) != nullptr)
 				throw std::logic_error("Two identical states were given in states initializer array");
 			_states[i] = states[i];
 		}
@@ -65,23 +71,23 @@ template<typename S, typename O>
 AbstractHMM<S, O>::AbstractHMM(	
 	const std::initializer_list<S>& states,
 	const std::initializer_list<std::initializer_list<float>>& initTransitions):
-		AbstractHMM(states), _transP(new S[states.size()*states.size()]){
+		AbstractHMM(states), _transP(new float[states.size()*states.size()]){
 			if(initTransitions.size() != states.size() || initTransitions[0].size() != states.size())
 				throw std::logic_error("Wrong size of init transitions probabilities");
 			std::copy(std::begin(initTransitions), std::end(initTransitions), _transP);
 		}
 
 template<typename S, typename O>
-float AbstractHMM<S, O>::transp(std::size_t i, std::size_t j){
-	if(!stateInBounds(i) || !stateInBounds(j))
+float AbstractHMM<S, O>::trans_p(std::size_t i, std::size_t j){
+	if(!state_inBounds(i) || !state_inBounds(j))
 		throw std::out_of_range("State out of bounds");
 	return _transp[i*j];
 }
 
 template<typename S, typename O>
-float AbstractHMM<S, O>::transp(S firstState, S secondState){
+float AbstractHMM<S, O>::trans_p(S firstState, S secondState){
 	std::size_t i,j;
-	if(i=find(firstState) == nullptr || j=find(secondState) == nullptr)
+	if(i=find_state(firstState) == nullptr || j=find_state(secondState) == nullptr)
 		throw logic_error("State not found");
 	return _transp[i*j];
 }
