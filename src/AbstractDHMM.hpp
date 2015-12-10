@@ -10,17 +10,16 @@
 template<typename S, typename O>
 class AbstractDHMM: public virtual AbstractHMM<S, O>{
 private:
-	O* _observations;
-	std::size_t _nObservations;
-	double* _emiP;
+	std::vector<O> _observations;
+	std::vector<double> _emiP;
 
 protected:
 	AbstractDHMM(
 		const std::vector<O>& observations,
 		const std::vector<double>& emiP,
 		std::size_t nStates) :
-			AbstractHMM<S, O>({}, {}, {}), _observations(new O[observations.size()]), 
-			_nObservations(observations.size()), _emiP(new double[nStates*observations.size()]){
+			AbstractHMM<S, O>({}, {}, {}), _observations(std::vector<O>(observations.size())), 
+			_emiP(std::vector<double>(nStates*observations.size())){				
 				for(size_t i=0;i<observations.size();++i){
 					try{
 						find_observation(observations[i]);
@@ -31,11 +30,11 @@ protected:
 				}
 				if(emiP.size() != nStates*observations.size())
 					throw std::logic_error("Wrong size of init observation probabilities");
-				std::copy(emiP.begin(), emiP.end(), _emiP);
+				std::copy(emiP.begin(), emiP.end(), _emiP.begin());
 			}
 
 	bool observation_inBounds(const std::size_t i) const{
-		return (i>0 && i<_nObservations);
+		return (i>0 && i<observations());
 	}
 
 public:
@@ -52,7 +51,7 @@ public:
 	}
 
 	std::size_t find_observation(const O obs) const{
-		for(std::size_t i=0;i<_nObservations;++i){
+		for(std::size_t i=0;i<observations();++i){
 			if(_observations[i] == obs){
 				return i;
 			}
@@ -60,9 +59,9 @@ public:
 		throw std::out_of_range("Observation not found");
 	}
 
-	std::size_t observations() const { return _nObservations; }
+	std::size_t observations() const { return _observations.size(); }
 
-	virtual ~AbstractDHMM(){ delete[] _observations; delete[] _emiP; }
+	virtual ~AbstractDHMM(){}
 };
 
 #endif

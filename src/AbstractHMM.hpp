@@ -4,14 +4,15 @@
 #include <exception>
 #include <stdexcept>
 #include <vector>
+#include <map>
 
 template<typename S, typename O> 
 class AbstractHMM {
 private:
-	S* _states;
-	std::size_t _nStates;
-	double* _transP;
-	double* _initP;
+	std::vector<S> _states;
+	std::vector<double> _transP;
+	std::vector<double> _initP;
+	std::map<S, std::vector<S>> _outStates;
 
 protected:
 	AbstractHMM(
@@ -20,7 +21,7 @@ protected:
 		const std::vector<double>&);
 
 	virtual bool state_inBounds(const std::size_t i) const{
-		return (i>0 && i<_nStates);
+		return (i>0 && i<states());
 	}
 
 	virtual bool observation_inBounds(const std::size_t) const = 0;
@@ -46,10 +47,10 @@ public:
 	virtual void train_baumWelch(const std::vector<O>&) = 0;
 	virtual void train_stochasticEM(const std::vector<O>&) = 0;
 
-	virtual ~AbstractHMM(){ delete[] _states; delete[] _transP; delete[] _initP; }
+	virtual ~AbstractHMM(){}
 
 	virtual std::size_t find_state(const S state) const{
-		for(std::size_t i=0;i<_nStates;++i){
+		for(std::size_t i=0;i<_states.size();++i){
 			if(_states[i] == state){
 				return i;
 			}
@@ -59,8 +60,12 @@ public:
 
 	virtual std::size_t find_observation(const O obs) const = 0;
 
-	virtual std::size_t states() const { return _nStates; };
+	virtual std::size_t states() const { return _states.size(); };
 	virtual std::size_t observations() const = 0;
+
+	virtual void to_dot_file() const{
+
+	}
 
 
 };
@@ -70,9 +75,10 @@ AbstractHMM<S, O>::AbstractHMM(
 	const std::vector<S>& states,
 	const std::vector<double>& transP,
 	const std::vector<double>& initP):
-		_states(new S[states.size()]), _nStates(states.size()), 
-		_transP(new double[states.size()*states.size()]), 
-		_initP(new double[states.size()]){
+		_states(std::vector<S>(states.size())), 
+		_transP(std::vector<double>(states.size()*states.size())), 
+		_initP(std::vector<double>(states.size())),
+		_outStates(std::map<S, std::vector<S>>()){
 			for(std::size_t i=0;i<states.size();++i){
 				try{
 					find_state(states[i]);
@@ -86,20 +92,25 @@ AbstractHMM<S, O>::AbstractHMM(
 				throw std::logic_error("Wrong vector size for transitions probabilities");
 			if(initP.size() != states.size())
 				throw std::logic_error("Wrond vector size for initial probabilities");
-			std::copy(transP.begin(), transP.end(), _transP);
-			std::copy(std::begin(initP), std::end(initP), _initP);
+			std::copy(transP.begin(), transP.end(), _transP.begin());
+			std::copy(initP.begin(), initP.end(), _initP.begin());
+			/* By default, outdegree(state) = nstate */
+			for(S state : _states){
+				_outStates[state] = std::vector<S>(_states.size());
+				std::copy(_states.begin(), _states.end(), _outStates[state].begin());
+			}
 		}
 
 template<typename S, typename O>
 double AbstractHMM<S, O>::trans_p(std::size_t i, std::size_t j) const{
 	if(!state_inBounds(i) || !state_inBounds(j))
 		throw std::out_of_range("State out of bounds");
-	return _transP[i*_nStates + j];
+	return _transP[i*states() + j];
 }
 
 template<typename S, typename O>
 double AbstractHMM<S, O>::trans_p_by_object(S firstState, S secondState) const{
-	return _transP[find_state(firstState)*_nStates + find_state(secondState)];
+	return _transP[find_state(firstState)*states() + find_state(secondState)];
 }
 
 template<typename S, typename O>
