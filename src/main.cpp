@@ -45,8 +45,9 @@ void printInit(){
 void printResults(){
 	std::cout << separator << std::endl;
 	std::cout <<  BOLDMAGENTA << "Ran " << assertions << " test(s) : " << RESET;
-	std::cout << BOLDRED << failed << " failed " << RESET;
-	std::cout << BOLDGREEN << successful << " succeeded" << RESET << std::endl;
+	std::cout << BOLDGREEN << successful << " succeeded " << RESET;
+	std::cout << BOLDRED << failed << " failed" << RESET << std::endl;
+	
 }
 
 int main(){
@@ -57,13 +58,24 @@ int main(){
 									0.7,0.3});
 		std::vector<double> initP({0.0,1});
 		std::vector<double> emiP({	0.1,0.9,
-									0.9,0.1});
+									0.8,0.2});
 		LMDHMM<int, char> hmm(observations, emiP, states, transP, initP);
 
 		
 		printInit();
+		/* Testing constructors */
 		ASSERT("observations.size() == hmm.observations()", observations.size() == hmm.observations());
 		ASSERT("states.size() == hmm.states()",states.size() == hmm.states());
+		ASSERT("hmm.emi_p_by_object(1,'a') == 0.1",hmm.emi_p_by_object(1,'a') == 0.1);
+		ASSERT("hmm.emi_p_by_object(2,'a') == 0.8", hmm.emi_p_by_object(2,'a') == 0.8);
+		ASSERT("hmm.trans_p_by_object(1,1) == 0.3",hmm.trans_p_by_object(1,1) == 0.3);
+		ASSERT("hmm.trans_p_by_object(2,1) == 0.7",hmm.trans_p_by_object(2,1) == 0.7);
+		ASSERT("hmm.init_p_by_object(1) == 0",hmm.init_p_by_object(1) == 0);
+
+		/* Testing decoding */
+
+		/* Testing training */
+		
 		printResults();
 		
 	} catch(const std::exception& e){

@@ -14,10 +14,10 @@ protected:
 	AbstractLMHMM(): AbstractHMM<S, O>({}, {}, {}) {}
 
 public:
-	virtual void viterbi(const std::vector<O>& seq){}
-	virtual void train_viterbi(const std::vector<O>& seq){}
-	virtual void train_baumWelch(const std::vector<O>& seq){}
-	virtual void train_stochasticEM(const std::vector<O>& seq){}
+	virtual void viterbi(const std::vector<O>&){}
+	virtual void train_viterbi(const std::vector<O>&){}
+	virtual void train_baumWelch(const std::vector<O>&){}
+	virtual void train_stochasticEM(const std::vector<O>&){}
 };
 
 
