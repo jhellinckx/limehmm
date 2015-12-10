@@ -18,7 +18,7 @@ protected:
 		const std::initializer_list<S>&, 
 		const std::initializer_list<std::initializer_list<float>>&);
 
-	bool state_inBounds(const std::size_t i) const{
+	virtual bool state_inBounds(const std::size_t i) const{
 		return (i>0 && i<_nStates);
 	}
 
@@ -26,12 +26,12 @@ protected:
 
 public:
 	/* Transition probabilities getters*/
-	float trans_p(std::size_t, std::size_t) const;
-	float trans_p(S, S) const;
+	virtual float trans_p(std::size_t, std::size_t) const;
+	virtual float trans_p_by_object(S, S) const;
 
 	/* Emission probabilities getters, defined in derived classes */
-	float emi_p(std::size_t, std::size_t) const = 0;
-	float emi_p(S, O) const = 0;
+	virtual float emi_p(std::size_t, std::size_t) const = 0;
+	virtual float emi_p_by_object(S, O) const = 0;
 
 	/* Decoding */
 	virtual void viterbi(const std::array<O>&) = 0;
@@ -78,17 +78,17 @@ AbstractHMM<S, O>::AbstractHMM(
 		}
 
 template<typename S, typename O>
-float AbstractHMM<S, O>::trans_p(std::size_t i, std::size_t j){
+float AbstractHMM<S, O>::trans_p(std::size_t i, std::size_t j) const{
 	if(!state_inBounds(i) || !state_inBounds(j))
 		throw std::out_of_range("State out of bounds");
 	return _transp[i*j];
 }
 
 template<typename S, typename O>
-float AbstractHMM<S, O>::trans_p(S firstState, S secondState){
+float AbstractHMM<S, O>::trans_p_by_object(S firstState, S secondState) const{
 	std::size_t i,j;
 	if(i=find_state(firstState) == nullptr || j=find_state(secondState) == nullptr)
-		throw logic_error("State not found");
+		throw std::logic_error("State not found");
 	return _transp[i*j];
 }
 

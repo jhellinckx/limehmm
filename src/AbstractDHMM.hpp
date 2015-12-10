@@ -35,6 +35,23 @@ protected:
 	}
 
 public:
+
+	virtual float emi_p(std::size_t state, std::size_t obs) const{
+		if(!state_inBounds(state))
+			throw std::out_of_range("State index out of bounds");
+		if(!observation_inBounds(obs))
+			throw std::out_of_range("Observation index out of bounds");
+		return _emiP[state*obs];
+	}
+	virtual float emi_p_by_object(S state, O obs) const{
+		std::size_t s,o;
+		if(s=find_state(state) == nullptr)
+			throw std::logic_error("State not found");
+		if(o=find_observation(obs) == nullptr)
+			throw std::logic_error("Observation not found");
+		return _emiP[s*o];
+	}
+
 	std::size_t find_observation(const O obs) const{
 		for(std::size_t i=0;i<_nObservations;++i){
 			if(_observations[i] == obs){
