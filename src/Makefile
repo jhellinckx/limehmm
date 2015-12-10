@@ -1,10 +1,6 @@
-ifeq (${CC},)
-	CC = clang++
-endif
+CC = clang++
+CPPFLAGS = -std=c++11 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
 
-ifeq (${CPPFLAGS},)
-	CPPFLAGS = -std=c++11 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
-endif
 
 all: main
 

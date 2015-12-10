@@ -3,6 +3,7 @@
 
 #include <exception>
 #include <stdexcept>
+#include <vector>
 
 #include "AbstractHMM.hpp"
 
@@ -10,13 +11,13 @@ template<typename S, typename O>
 class AbstractLMHMM : public virtual AbstractHMM<S, O>{
 
 protected:
-	AbstractLMHMM(): AbstractHMM<S, O>({},{{}}) {}
+	AbstractLMHMM(): AbstractHMM<S, O>({}, {}, {}) {}
 
 public:
-	virtual void viterbi(std::array<O>&);
-	virtual void train_viterbi(const std::array<O>&);
-	virtual void train_baumWelch(const std::array<O>&);
-	virtual void train_stochasticEM(const std::array<O>&);
+	virtual void viterbi(const std::vector<O>& seq){}
+	virtual void train_viterbi(const std::vector<O>& seq){}
+	virtual void train_baumWelch(const std::vector<O>& seq){}
+	virtual void train_stochasticEM(const std::vector<O>& seq){}
 };
 
 
