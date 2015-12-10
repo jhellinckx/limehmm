@@ -4,7 +4,8 @@
 #include <exception>
 #include <stdexcept>
 
-template<typename S, typename O> class AbstractHMM {
+template<typename S, typename O> 
+class AbstractHMM {
 private:
 	S* _states;
 	std::size_t _nStates;
@@ -29,12 +30,12 @@ public:
 	float emip(S, O) const;
 
 	/* Decoding */
-	virtual void viterbi_path(const std::array<O>&) = 0;
+	virtual void viterbi(const std::array<O>&) = 0;
 
 	/* Training procedures */
-	virtual void viterbi_training(const std::array<O>&) = 0;
-	virtual void baum_welch_training(const std::array<O>&) = 0;
-	virtual void stochastic_EM_taining(const std::array<O>&) = 0;
+	virtual void train_viterbi(const std::array<O>&) = 0;
+	virtual void train_baumWelch(const std::array<O>&) = 0;
+	virtual void train_stochasticEM(const std::array<O>&) = 0;
 
 	virtual ~AbstractHMM(){ delete[] _states; delete[] _transP; }
 
