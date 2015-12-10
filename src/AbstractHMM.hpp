@@ -63,6 +63,29 @@ public:
 	virtual std::size_t states() const { return _states.size(); };
 	virtual std::size_t observations() const = 0;
 
+
+	/* Digraph methods */
+	virtual bool hasSuccessor(S from, S to){
+		for(S outState : _outStates[from]){
+			if(outState == to)
+				return true;
+		}
+		return false;
+	}
+
+	virtual void addSuccessor(S from, S to){
+		if(!hasSuccessor(from, to))
+			_outStates[from].push_back(to);
+	}
+
+	virtual void setSuccessors(S from, std::vector<S> successors){
+		_outStates[from] = successors;
+	}
+
+	std::vector<S> successors(S from) const {
+		return _outStates[from];
+	}
+
 	virtual void to_dot_file() const{
 
 	}
