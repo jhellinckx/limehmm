@@ -66,6 +66,7 @@ public:
 
 	/* Digraph methods */
 	virtual bool hasSuccessor(S from, S to){
+		find_state(from); find_state(to);
 		for(S outState : _outStates[from]){
 			if(outState == to)
 				return true;
@@ -74,15 +75,19 @@ public:
 	}
 
 	virtual void addSuccessor(S from, S to){
+		find_state(from); find_state(to);
 		if(!hasSuccessor(from, to))
 			_outStates[from].push_back(to);
 	}
 
-	virtual void setSuccessors(S from, std::vector<S> successors){
-		_outStates[from] = successors;
+	virtual void setSuccessors(S from, const std::vector<S>& successors){
+		for(S state : successors)
+			find_state(state);
+		_outStates[from].resize(successors.size());
+		std::copy(successors.begin(), successors.end(), _outStates[from].begin());
 	}
 
-	std::vector<S> successors(S from) const {
+	std::vector<S> successors(S from) {
 		return _outStates[from];
 	}
 

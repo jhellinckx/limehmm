@@ -52,30 +52,42 @@ void printResults(){
 
 int main(){
 	try{
-		std::vector<char> observations({'a', 'b'});
-		std::vector<int> states({1, 2});
-		std::vector<double> transP({0.3,0.7,
-									0.7,0.3});
-		std::vector<double> initP({0.0,1});
-		std::vector<double> emiP({	0.1,0.9,
-									0.8,0.2});
-		LMDHMM<int, char> hmm(observations, emiP, states, transP, initP);
+		std::vector<std::string> observations({"walk", "shop", "clean"});
+		std::vector<std::string> states({"rainy", "sunny"});
+		std::vector<double> initial_state_probabilities({0.6,0.4});
+		
+		std::vector<double> transition_probabilities({	0.7, 0.3,
+														0.4, 0.6 	});
+		
+		std::vector<double> emission_probabilities({	0.1, 0.4, 0.5,
+														0.6, 0.3, 0.1	});
+
+		/* Create a Discrete Hidden Markov Model with Linear Memory */
+		LMDHMM<std::string, std::string> hmm(observations, emission_probabilities, states, 
+			transition_probabilities, initial_state_probabilities);
 
 		
 		printInit();
 		/* Testing constructors */
-		ASSERT("observations.size() == hmm.observations()", observations.size() == hmm.observations());
-		ASSERT("states.size() == hmm.states()",states.size() == hmm.states());
-		ASSERT("hmm.emi_p_by_object(1,'a') == 0.1",hmm.emi_p_by_object(1,'a') == 0.1);
-		ASSERT("hmm.emi_p_by_object(2,'a') == 0.8", hmm.emi_p_by_object(2,'a') == 0.8);
-		ASSERT("hmm.trans_p_by_object(1,1) == 0.3",hmm.trans_p_by_object(1,1) == 0.3);
-		ASSERT("hmm.trans_p_by_object(2,1) == 0.7",hmm.trans_p_by_object(2,1) == 0.7);
-		ASSERT("hmm.init_p_by_object(1) == 0",hmm.init_p_by_object(1) == 0);
+		ASSERT("Observations number", observations.size() == hmm.observations());
+		ASSERT("States number",states.size() == hmm.states());
+		ASSERT("Emission probability by object",hmm.emi_p_by_object("rainy","clean") == 0.5);
+		ASSERT("Emission probability by object", hmm.emi_p_by_object("sunny","shop") == 0.3);
+		ASSERT("Transition probability by object",hmm.trans_p_by_object("rainy","sunny") == 0.3);
+		ASSERT("Transition probability by object",hmm.trans_p_by_object("sunny","sunny") == 0.6);
+		ASSERT("Initial state probability by object",hmm.init_p_by_object("rainy") == 0.6);
+		
+		/* Testing digraph */
+		ASSERT("Successors initialization",hmm.successors("rainy") == states);
+		hmm.addSuccessor("rainy","rainy");
+		ASSERT("Adding existing successor",hmm.successors("rainy") == states);
+
 
 		/* Testing decoding */
+		//TODO
 
 		/* Testing training */
-		
+		//TODO
 		printResults();
 		
 	} catch(const std::exception& e){

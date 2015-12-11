@@ -44,10 +44,10 @@ public:
 			throw std::out_of_range("State index out of bounds");
 		if(!observation_inBounds(obs))
 			throw std::out_of_range("Observation index out of bounds");
-		return _emiP[state*this->states() + obs];
+		return _emiP[state*observations() + obs];
 	}
 	virtual double emi_p_by_object(S state, O obs) const{
-		return _emiP[this->find_state(state)*this->states() + find_observation(obs)];
+		return _emiP[this->find_state(state)*this->observations() + find_observation(obs)];
 	}
 
 	std::size_t find_observation(const O obs) const{
