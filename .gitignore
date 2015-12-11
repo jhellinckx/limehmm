@@ -9,6 +9,17 @@
 *.glo
 *.ist
 *.gz
+*.gls
+*.glg
+*.fdb_latexmk
 
 # Ignore objects files
 .o
+
+* Ignore exec file
+main
+test
+
+# Ignore graphviz files
+*.dot
+*.eps
