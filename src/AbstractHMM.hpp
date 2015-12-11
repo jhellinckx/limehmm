@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <map>
+#include <fstream>
 
 template<typename S, typename O> 
 class AbstractHMM {
@@ -60,7 +61,7 @@ public:
 
 	virtual std::size_t find_observation(const O obs) const = 0;
 
-	virtual std::size_t states() const { return _states.size(); };
+	virtual std::size_t states() const { return _states.size(); }
 	virtual std::size_t observations() const = 0;
 
 
@@ -91,8 +92,26 @@ public:
 		return _outStates[from];
 	}
 
-	virtual void to_dot_file() const{
+	virtual void to_dot_file(std::string filename = "HMM_graph.dot"){
+		std::string header = "digraph my_graph {\n";
+		std::string foot = "}";
+		std::string to = "->";
+		std::string endarc = ";\n";
+		std::string prelabel = "[label=\"";
+		std::string postlabel = "\"]";
 
+		std::ofstream graphFile;
+		graphFile.open(filename);
+
+		graphFile << header;
+		for(S state : _states){
+			for(S successor : _outStates[state]){
+				graphFile << state << to << successor <<  prelabel << 
+					trans_p_by_object(state, successor) << postlabel << endarc;
+			}
+		}
+		graphFile << foot;
+		graphFile.close();
 	}
 
 

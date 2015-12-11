@@ -7,5 +7,12 @@ all: main
 main: main.cpp
 	${CC} ${CPPFLAGS} $^ -o $@ 
 
+GRAPHS := $(patsubst %.dot,%.eps,$(wildcard *.dot))
+
+%.eps: %.dot
+	dot -Teps $< > $@
+
+graph:	${GRAPHS}
+
 clean: 
-	rm -f main
+	rm -f main && rm -f *.eps

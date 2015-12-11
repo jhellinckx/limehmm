@@ -89,6 +89,8 @@ int main(){
 		/* Testing training */
 		//TODO
 		printResults();
+
+		hmm.to_dot_file();
 		
 	} catch(const std::exception& e){
 		printException(e);
