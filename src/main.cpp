@@ -44,7 +44,7 @@ void printInit(){
 
 void printResults(){
 	std::cout << separator << std::endl;
-	std::cout <<  BOLDMAGENTA << "Ran " << assertions << " test(s) : " << RESET;
+	std::cout << BOLDMAGENTA << "Ran " << assertions << " test(s) : " << RESET;
 	std::cout << BOLDGREEN << successful << " succeeded " << RESET;
 	std::cout << BOLDRED << failed << " failed" << RESET << std::endl;
 	
@@ -76,6 +76,8 @@ int main(){
 		ASSERT("Transition probability by object",hmm.trans_p_by_object("rainy","sunny") == 0.3);
 		ASSERT("Transition probability by object",hmm.trans_p_by_object("sunny","sunny") == 0.6);
 		ASSERT("Initial state probability by object",hmm.init_p_by_object("rainy") == 0.6);
+
+		/* Testing factory */
 		
 		/* Testing digraph */
 		ASSERT("Successors initialization",hmm.successors("rainy") == states);

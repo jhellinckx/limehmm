@@ -93,7 +93,7 @@ public:
 	}
 
 	virtual void to_dot_file(std::string filename = "HMM_graph.dot"){
-		std::string header = "digraph my_graph {\n";
+		std::string header = "Digraph my_graph {\n";
 		std::string foot = "}";
 		std::string to = "->";
 		std::string endarc = ";\n";
