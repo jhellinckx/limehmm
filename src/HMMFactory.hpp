@@ -3,10 +3,15 @@
 
 namespace TrainingAlgorithm{
 public:
-	static const int VITERBI = 1;
-	static const int BAUM_WELCH = 2;
-	static const int EM = 3;
+	static const int LINEAR_VITERBI = 1;
+	static const int LINEAR_BAUM_WELCH = 2;
+	static const int LINEAR_EM = 3;
 };
+
+namespace DecodingAlgorithm{
+public:
+	static const int LINEAR_VITERBI = 1;
+}
 
 using namespace TrainingAlgorithm;
 
@@ -22,6 +27,7 @@ public:
 									const std::vector<double>& initP,
 									int trainingAlgorithm){
 
+		
 	}
 };
 
