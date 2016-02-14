@@ -7,31 +7,29 @@ private:
 	std::vector<Symbol> _alphabet;
 
 public:
-	Model() : _states(std::vector<State>()), _alphabet(std::vector<Symbol>){
-
-	}
+	Model() : _states(std::vector<State>()), _alphabet(){}
 
 	Model(const std::vector<State>& states) : 
-		_states(std::vector<State>(states.size())), 
-		_alphabet(std::vector<Symbol>()){
+		_states(states.size()), 
+		_alphabet(){
 			std::copy(states.begin(), states;end(), _states.begin());
 	}
 
 	Model(const std::vector<Symbol>& alphabet) :
-		_states(std::vector<State>()),
-		_alphabet(std::vector<Symbol>(alphabet.size())){
+		_states(),
+		_alphabet(alphabet.size()){
 			std::copy(alphabet.begin(), alphabet.end(), _alphabet.begin());
 		}
 
 	Model(const std::vector<State>& states, const std::vector<Symbol>& alphabet) :
-		_states(std::vector<State>(states.size())),
-		_alphabet(std::vector<Symbol>(alphabet.size())){
+		_states(states.size()),
+		_alphabet(alphabet.size()){
 			std::copy(states.begin(), states.end(), _states.begin());
 			std::copy(alphabet.begin(), alphabet.end(), _alphabet.begin());
 		}
 
-	virtual std::size_t states() const { return _states.size(); }
-	virtual std::size_t symbols() const { return _alphabet.size(); }
+	virtual std::size_t statesNumber() const { return _states.size(); }
+	virtual std::size_t alphabetSize() const { return _alphabet.size(); }
 
 	virtual State* getState(std::size_t i) {
 		if(i >= 0 && i < _states.size())
