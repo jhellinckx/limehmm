@@ -16,7 +16,9 @@ public:
 
 		}
 
-	State(const std::vector<double>& emiP, const std::vector<double>& transP)
+
+
+	State(const std::vector<double>& emiP, const std::vector<double>& transP) 
 	std::string identifier() { return _identifier; }
 
 	void newState() {
