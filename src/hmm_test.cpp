@@ -9,7 +9,7 @@
 #include <string>
 #include <stdlib.h>
 
-#include "hmm.hpp"
+#include "hmm.hpp" // tested hmm library
 
 #define ASSERT(expr) assert(expr, #expr, __FILE__, __LINE__)
 #define ASSERT_VERBOSE(expr, msg) assert(expr, #expr, __FILE__, __LINE__, msg)
@@ -37,11 +37,11 @@ int units = 0;
 int failed = 0;
 int successful = 0;
 
-template<typename Functor>
-void run_unit_test(const std::string& name, Functor functor){
+template<typename Runnable>
+void run_unit_test(const std::string& name, Runnable runnable){
 	++units;
 	if(VERBOSE) std::cout << THIN_SEPARATOR << std::endl << "Testing " << MAGENTA << name << RESET << "..."  << std::endl;
-	functor();
+	runnable();
 }
 
 void assert(bool assertion, const char* assertion_c_str, const char* filename, long int line, std::string fail_message = "", bool fail_abort = false){
@@ -63,10 +63,10 @@ void assert(bool assertion, const char* assertion_c_str, const char* filename, l
 	}
 }
 
-template<typename ExceptionType, typename Functor>
-void assert_except(Functor functor, const char* instruction_c_str, const char* exception_c_str, const char* filename, long int line){
+template<typename ExceptionType, typename Runnable>
+void assert_except(Runnable runnable, const char* instruction_c_str, const char* exception_c_str, const char* filename, long int line){
 	try{
-		functor();
+		runnable();
 		assert(false, instruction_c_str, filename, line, std::string(exception_c_str) + " expected but no exception was thrown");
 	}
 	catch(const ExceptionType& e){
@@ -107,6 +107,7 @@ int main(){
 
 		TEST_UNIT(
 			"state creation/distribution",
+			/* Construct silent states with same name. */
 			State s1("state");
 			State s2("state");
 			ASSERT(s1 == s2);
@@ -126,7 +127,7 @@ int main(){
 			dist1["B"] = 0;
 			State s4("state", dist1);
 			ASSERT(s4.is_silent());
-			/* Probabilites summing to i > 0 makes a state not silent */
+			/* Probabilites summing to i > 0 makes a state not silent. */
 			dist1["C"] = 0.4;
 			State s5("state", dist1);
 			ASSERT(!s5.is_silent());
@@ -136,21 +137,26 @@ int main(){
 			/* Despite having a distribution, s3 is equal to s1 because they have the same name. 
 			States equality is currently equivalent to their name equality. */
 			ASSERT(s3 == s1);
-			/* State copy constructor copies the distribution */
+			/* State copy constructor copies the distribution. */
 			State s6(s3);
 			ASSERT(s6.distribution() == s3.distribution());
+			/* DiscreteDistribution is constructible from an initializer_list of (std::string, double) pairs. */
 			DiscreteDistribution dist2({{"A", 0.2}, {"G", 0.4}, {"C", 0.1}, {"T", 0.3}});
 			ASSERT(dist2["A"] == 0.2);
 			ASSERT((dist2["A"] = 0.5) == 0.5);
+			/* Copy constructor/assignment operator for DiscreteDistribution. */
 			DiscreteDistribution dist3 = dist2;
 			ASSERT(dist3["A"] == 0.5);
 			ASSERT(dist2 == dist3);
+			/* Accessing a symbol not contained by the distribution will call the default
+			constructor of the symbol and add it to the distribution
+			(this has ultimately the same behavior as std::map). */
 			double default_value = dist2["NotKey"];
-			ASSERT(default_value == double());
+			ASSERT(double() == default_value);
+			/* Accessing "NotKey" created an entry in the distribution : (NotKey : 0). */
+			ASSERT(dist2["NotKey"] == default_value);
+			/* Thus, distributions will now differ. */
 			ASSERT((dist2 != dist3));
-			DiscreteDistribution dist4 = dist2;
-			ASSERT((dist4["A"] = 0.2) == 0.2);
-			ASSERT((dist2 != dist4));
 		)
 		
 		TEST_UNIT(

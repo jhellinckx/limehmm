@@ -24,6 +24,8 @@ hmm_test
 # Ignore graphviz files
 *.dot
 *.eps
+
+# Misc
 .DS_Store
 libs
 old

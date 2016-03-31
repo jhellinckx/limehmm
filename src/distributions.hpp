@@ -81,25 +81,25 @@ public:
 		return new DiscreteDistribution(*this);
 	}
 
+	double prob_sum() const {
+		return std::accumulate(_distribution.begin(), _distribution.end(), double(), 
+			[](const double previous, const std::pair<std::string,double>& entry) { 
+				return previous + entry.second;
+			});
+	}
+
 	std::string to_string() const {
 		std::string str = Distribution::to_string() + ": ";
 		std::for_each(_distribution.begin(), _distribution.end(), 
 			[&str](const std::pair<std::string,double>& entry){
 				str += entry.first + "(" + std::to_string(entry.second) + ") ";
 			});
-		str += "-> sum " + std::to_string(std::accumulate(_distribution.begin(), _distribution.end(), 0, 
-											[](const double previous, const std::pair<std::string,double>& entry) { 
-												return previous + entry.second;
-											}));
+		str += "-> sum " + std::to_string(prob_sum());
 		return str;
 	}
 
 	bool empty() const {
-		return _distribution.size() == 0 
-		||  std::accumulate(_distribution.begin(), _distribution.end(), 0, 
-				[](const double previous, const std::pair<std::string,double>& entry) { 
-					return previous + entry.second;
-				}) == 0;
+		return _distribution.size() == 0 || prob_sum() == 0;
 	}
 
 	bool is_discrete() const { return true; }
