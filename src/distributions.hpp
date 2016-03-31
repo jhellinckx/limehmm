@@ -1,0 +1,164 @@
+#ifndef __DISTRIBUTION_HPP
+#define __DISTRIBUTION_HPP
+
+#include <string>
+#include <algorithm>
+#include <map>
+#include <numeric>
+#include "constants.hpp"
+
+
+/* <-------- Exceptions --------> */
+
+class DistributionException : public std::logic_error {
+protected:
+	DistributionException(const std::string& message) :
+		std::logic_error(message) {}
+};
+
+class DistributionSymbolNotFoundException : public DistributionException {
+public:
+	template<typename T>
+	DistributionSymbolNotFoundException(const T& t) : 
+		DistributionException(error_message::format("DistributionSymbolNotFoundException: " + error_message::kDistributionSymbolNotFound, t)) {}
+};
+
+/* <----------------------------> */
+
+class Distribution {
+private:
+	std::string _name;
+
+public:
+	Distribution() : 
+		Distribution(distribution_config::kDistributionName) {}
+	Distribution(const std::string& name) : _name(name) {}
+
+	virtual std::string name() const { return _name; }
+	virtual bool is_discrete() const { return false; }
+	virtual bool is_continuous() const { return false; }
+	
+	/* Pure virtual methods */
+	/* Get probabilities with operator[] */
+	virtual bool empty() const = 0;
+	virtual std::string to_string() const {
+		return _name;
+	}
+	virtual double& operator[] (const std::string&) = 0;
+	virtual double& operator[] (const double&) = 0;
+	virtual bool operator==(const Distribution& other) const = 0;
+	virtual bool operator!=(const Distribution& other) const = 0;
+	/* For polymorphic use */
+	virtual Distribution* clone() const = 0;
+	virtual ~Distribution() {}
+};
+
+std::ostream& operator<<(std::ostream& out, const Distribution& dist){
+	out << dist.to_string();
+	return out;
+}
+
+
+/* This class is basically a wrapper around std::map... */
+class DiscreteDistribution : public Distribution{
+private:
+	std::map<std::string, double> _distribution;
+public:
+	DiscreteDistribution() : 
+		DiscreteDistribution(distribution_config::kDiscreteDistributionName) {}
+
+	DiscreteDistribution(const std::string& name) :
+		Distribution(name), _distribution() {}
+
+	DiscreteDistribution(std::initializer_list<std::pair<const std::string, double>> distribution) : 
+		Distribution(distribution_config::kDiscreteDistributionName), _distribution(distribution) {}
+
+	DiscreteDistribution(const DiscreteDistribution& other) :
+		Distribution(other.name()), _distribution(other._distribution) {}
+
+	/* Covariant return type */
+	virtual DiscreteDistribution* clone() const {
+		return new DiscreteDistribution(*this);
+	}
+
+	std::string to_string() const {
+		std::string str = Distribution::to_string() + ": ";
+		std::for_each(_distribution.begin(), _distribution.end(), 
+			[&str](const std::pair<std::string,double>& entry){
+				str += entry.first + "(" + std::to_string(entry.second) + ") ";
+			});
+		str += "-> sum " + std::to_string(std::accumulate(_distribution.begin(), _distribution.end(), 0, 
+											[](const double previous, const std::pair<std::string,double>& entry) { 
+												return previous + entry.second;
+											}));
+		return str;
+	}
+
+	bool empty() const {
+		return _distribution.size() == 0 
+		||  std::accumulate(_distribution.begin(), _distribution.end(), 0, 
+				[](const double previous, const std::pair<std::string,double>& entry) { 
+					return previous + entry.second;
+				}) == 0;
+	}
+
+	bool is_discrete() const { return true; }
+
+	bool contains(const std::string& symbol) const {
+		return _distribution.find(symbol) != _distribution.end();
+	}
+	bool contains(const std::string& symbol) {
+		return _distribution.find(symbol) != _distribution.end();
+	}
+
+	virtual double& operator[] (const std::string& symbol) {
+		return _distribution[symbol];
+	}
+
+	virtual double& operator[] (const double& symbol) {
+		return operator[](std::to_string(symbol));
+	}
+
+	virtual bool operator==(const DiscreteDistribution& other) const {
+		return (other.name() == this->name()) && (other._distribution == _distribution);
+	}
+
+	virtual bool operator==(const Distribution& other) const {
+		if(other.is_discrete()){
+			return operator==((DiscreteDistribution&) other);
+		}
+		return false;
+	}
+
+	virtual bool operator!=(const Distribution& other) const{
+		return ! operator==(other);
+	}
+
+	virtual ~DiscreteDistribution() {}
+};
+
+
+class ContinuousDistribution : public Distribution {
+public:
+	ContinuousDistribution() : 
+		ContinuousDistribution(distribution_config::kContinuousDistributionName) {}
+	ContinuousDistribution(const std::string& name) : 
+		Distribution(name) {}
+
+	bool is_continuous() const { return true; }
+	virtual ~ContinuousDistribution() {}
+};
+
+class NormalDistribution : public ContinuousDistribution {
+public:
+	NormalDistribution() : ContinuousDistribution(distribution_config::kNormalDistributionName) {}
+	virtual ~NormalDistribution() {}
+};
+
+class UniformDistribution : public ContinuousDistribution {
+public:
+	UniformDistribution() : ContinuousDistribution(distribution_config::kUniformDistributionName) {}
+	virtual ~UniformDistribution() {}
+};
+
+#endif
