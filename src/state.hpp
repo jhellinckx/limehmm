@@ -4,7 +4,7 @@
 #include <vector>
 #include <exception>
 #include "constants.hpp"
-#include "distribution.hpp"
+#include "distributions.hpp"
 
 /* <-------- Exceptions --------> */
 
@@ -29,19 +29,23 @@ private:
 	std::string _name;
 	/* Emission probabilities */
 	Distribution* _distribution;
+	/* Free emission */
+	bool _free_emission;
+	/* Free transition */
+	bool _free_transition;
 
 public:
-	State(const std::string& name) : _name(name), _distribution(nullptr) {}
+	State(const std::string& name) : _name(name), _distribution(nullptr), 
+		_free_emission(hmm_config::kDefaultFreeEmission), 
+		_free_transition(hmm_config::kDefaultFreeTransition) {}
 
-	State(const char* c_str) : _name(), _distribution(nullptr){
-		if(c_str != nullptr){
-			_name = c_str;
-		}
-	}
+	State(const char* c_str) : State(std::string(c_str)) {}
 
 	template<typename DistributionType>
 	explicit State(const std::string& name, const DistributionType& distribution) : 
-		_name(name), _distribution(nullptr) {
+		_name(name), _distribution(nullptr),
+		_free_emission(hmm_config::kDefaultFreeEmission), 
+		_free_transition(hmm_config::kDefaultFreeTransition) {
 			_distribution = new DistributionType(distribution);
 	} 
 
@@ -82,6 +86,13 @@ public:
 		return _name == other.name();
 	}
 
+	bool free_emission() const { return _free_emission; }
+	bool free_transition() const { return _free_transition; }
+	void freeze_emission() { _free_emission = false; }
+	void freeze_transition() { _free_transition = false; }
+	void thaw_emission() { _free_emission = true; }
+	void thaw_transition() { _free_transition = true; }
+
 	Distribution& distribution() const {
 		if(_distribution != nullptr){
 			return *_distribution;	
@@ -93,7 +104,9 @@ public:
 
 	std::string name() const { return _name; }
 
-	bool is_silent() const { return _distribution == nullptr; }
+	bool is_silent() const { 
+		return _distribution == nullptr || _distribution->empty();
+	}
 
 	virtual ~State(){
 		delete _distribution;

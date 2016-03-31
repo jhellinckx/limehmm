@@ -19,7 +19,11 @@
 * Ignore exec file
 main
 test
+hmm_test
 
 # Ignore graphviz files
 *.dot
 *.eps
+.DS_Store
+libs
+old

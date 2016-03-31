@@ -177,14 +177,12 @@ class Graph{
 		return contains(Edge<VertexElementBase>(first, second)) || contains(Edge<VertexElementBase>(second, first));
 	}
 
-	std::vector<VertexElementBase&> _all_vertices() const {
-		std::vector<VertexElementBase&> ref_vertices;
-		ref_vertices.reserve(_vertices.size());
-		std::for_each(_vertices.begin(), _vertices.end(),
-						[&ref_vertices](const VertexElementBase* vertex){
-							ref_vertices.push_back(*vertex);
-						});
-		return ref_vertices;
+	std::vector<VertexElementBase*>& _all_vertices() const {
+		return _vertices;
+	}
+
+	std::vector<Edge<VertexElementBase>*>& _all_edges() const {
+		return _edges;
 	}
 
 	/* Adds a vertex if it is not contained by the graph,
@@ -349,8 +347,12 @@ public:
 	std::size_t num_vertices() const { return _vertices.size(); }
 	std::size_t num_edges() const { return _edges.size(); }
 
-	std::vector<VertexElementBase&> get_vertices() { 
+	std::vector<VertexElementBase*>& get_vertices() const { 
 		return _all_vertices();
+	}
+
+	std::vector<Edge<VertexElementBase>*>& get_edges() const {
+		return _all_edges();
 	}
 
 	bool contains(const VertexElementBase& vertex) const {

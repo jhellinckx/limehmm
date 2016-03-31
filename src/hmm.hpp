@@ -12,14 +12,27 @@
 #include "state.hpp"
 #include "graph.hpp"
 
+template<typename T>
+using Matrix = std::vector<std::vector<T>>;
+
 class HiddenMarkovModel{
 private:
+	/* Name of this hmm */
 	std::string _name;
 
+	/* Begin and end states */
 	State* _begin;
 	State* _end;
 
+	/* Holds the states and the transitions when building the hmm */
 	Graph<State> _graph;
+
+	/* Fields initialized after brew(). 
+	These fields are mainly used by hmm algorithms. */
+	/* Transition matrix */
+	Matrix<double> _A;
+	/* Distributions set */
+	std::vector<Distribution> _B;
 
 public:
 	/* Default constructor. Inits an empty hmm with default values. */
@@ -27,8 +40,8 @@ public:
 		HiddenMarkovModel(std::to_string((ptrdiff_t)this)) {}
 
 	HiddenMarkovModel(const std::string& name) : 
-		HiddenMarkovModel(name, State(default_hmm_config::kDefaultStartStateLabel + name), 
-			State(default_hmm_config::kDefaultEndStateLabel + name)) {}
+		HiddenMarkovModel(name, State(hmm_config::kDefaultStartStateLabel + name), 
+			State(hmm_config::kDefaultEndStateLabel + name)) {}
 
 	HiddenMarkovModel(const State& begin, const State& end) :
 		HiddenMarkovModel(std::to_string((ptrdiff_t)this), begin, end) {}
@@ -91,11 +104,21 @@ public:
 		_graph.remove_edge(from, to);
 	}
 
-	void prepare() {
+	/* Prepares the hmm before calling algorithms on it */
+	void brew() {
+		// /* Init raw emission and transition matrices */
+		// std::vector<State*>& states = _graph.get_vertices();
+		// std::for_each(states.begin(), states.end(),
+		// 				[&_A, &_B]
+		// /* Normalize transitions */
+		// std::vector<State*>& states = _graph.get_vertices();
+		// std::for_each(states.begin(), states.end(),
+		// 				[_A, _B]
 
+		// /* Normalize emissions */
 	}
 
-	void random_generate() {
+	void sample() {
 
 	}
 

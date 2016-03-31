@@ -23,6 +23,9 @@ namespace error_message {
 	/* State */
 	extern const std::string kSilentStateHasNoDistribution = "tried to get the emission probability of a silent state; but a silent state has no distribution";
 
+	/* Distribution */
+	extern const std::string kDistributionSymbolNotFound = "symbol not found in distribution";
+	
 	/* HMM */
 
 	template<typename T>
@@ -33,7 +36,9 @@ namespace error_message {
 	}
 }
 
-namespace default_hmm_config {
+namespace hmm_config {
+	extern const bool kDefaultFreeEmission = true;
+	extern const bool kDefaultFreeTransition = true;
 	extern const int kAutoStateLabelCountStart = 1;
 	extern const std::string kAutoStateLabelString = "state_";
 	extern const int kDefaultPi = 0;

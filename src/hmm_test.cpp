@@ -110,21 +110,47 @@ int main(){
 			State s1("state");
 			State s2("state");
 			ASSERT(s1 == s2);
+			/* If no distribution is given at construction, state is silent. */
 			ASSERT(s1.is_silent());
+			/* Throw exception if access distribution of silent state. */
 			ASSERT_EXCEPT(s1.distribution(), StateDistributionException);
-			State s3("state", DiscreteDistribution({{"yes", 0.9}, {"no", 0.1}}));
+			/* An empty distribution makes the state silent. */
+			DiscreteDistribution dist1;
+			State s3("state", dist1);
+			ASSERT(s3.is_silent());
+			/* State has own copy of distribution. */
+			ASSERT(s3.distribution() == dist1);
+			dist1["A"] = 0;
+			ASSERT(s3.distribution() != dist1);
+			/* A discrete distribution with probabilites summing to 0 is considered empty. */
+			dist1["B"] = 0;
+			State s4("state", dist1);
+			ASSERT(s4.is_silent());
+			/* Probabilites summing to i > 0 makes a state not silent */
+			dist1["C"] = 0.4;
+			State s5("state", dist1);
+			ASSERT(!s5.is_silent());
+			/* Check distribution type. */
 			ASSERT(s3.distribution().is_discrete());
 			ASSERT(!s3.distribution().is_continuous());
+			/* Despite having a distribution, s3 is equal to s1 because they have the same name. 
+			States equality is currently equivalent to their name equality. */
 			ASSERT(s3 == s1);
-			State s4(s3);
-			ASSERT(s4.distribution() == s3.distribution());
-			DiscreteDistribution dist1({{"A", 0.2}, {"G", 0.4}, {"C", 0.1}, {"T", 0.3}});
-			DiscreteDistribution dist2 = dist1;
+			/* State copy constructor copies the distribution */
+			State s6(s3);
+			ASSERT(s6.distribution() == s3.distribution());
+			DiscreteDistribution dist2({{"A", 0.2}, {"G", 0.4}, {"C", 0.1}, {"T", 0.3}});
 			ASSERT(dist2["A"] == 0.2);
-			ASSERT(dist1 == dist2);
-			ASSERT(dist1["A"] == 0.2);
-			ASSERT((dist1["A"] = 0.5) == 0.5);
-			ASSERT((dist1 != dist2));
+			ASSERT((dist2["A"] = 0.5) == 0.5);
+			DiscreteDistribution dist3 = dist2;
+			ASSERT(dist3["A"] == 0.5);
+			ASSERT(dist2 == dist3);
+			double default_value = dist2["NotKey"];
+			ASSERT(default_value == double());
+			ASSERT((dist2 != dist3));
+			DiscreteDistribution dist4 = dist2;
+			ASSERT((dist4["A"] = 0.2) == 0.2);
+			ASSERT((dist2 != dist4));
 		)
 		
 		TEST_UNIT(
