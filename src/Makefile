@@ -1,18 +1,12 @@
-CC = clang++
-CPPFLAGS = -std=c++11 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
+CC = g++ -std=c++11
+CPPFLAGS = -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
 
 
-all: main
+all: hmm_test
+	./hmm_test
 
-main: main.cpp
+hmm_test: hmm_test.cpp
 	${CC} ${CPPFLAGS} $^ -o $@ 
 
-GRAPHS := $(patsubst %.dot,%.eps,$(wildcard *.dot))
-
-%.eps: %.dot
-	dot -Teps $< > $@
-
-graph:	${GRAPHS}
-
 clean: 
-	rm -f main && rm -f *.eps
+	rm -f hmm_test
