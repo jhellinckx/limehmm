@@ -90,13 +90,13 @@ public:
 		std::function<double(double, const std::pair<std::string, double>&)> prob_adder;
 		if(this->uses_log_probabilities()){
 			init_sum = utils::kNegInf;
-			prob_adder = [](const double previous, const std::pair<std::string, double>& entry) { 
+			prob_adder = [](const double previous, const std::pair<const std::string, double>& entry) { 
 							return utils::sum_log_prob(previous, entry.second);
 						};
 		}
 		else{
 			init_sum = double(0);
-			prob_adder = [](const double previous, const std::pair<std::string, double>& entry) { 
+			prob_adder = [](const double previous, const std::pair<const std::string, double>& entry) { 
 							return previous + entry.second;
 						};
 		}
@@ -106,7 +106,7 @@ public:
 	std::string to_string() const {
 		std::string str = Distribution::to_string() + ": ";
 		std::for_each(_distribution.begin(), _distribution.end(), 
-			[&str](const std::pair<std::string,double>& entry){
+			[&str](const std::pair<const std::string,double>& entry){
 				str += entry.first + "(" + std::to_string(entry.second) + ") ";
 			});
 		str += "-> sum " + std::to_string(prob_sum());
@@ -119,13 +119,13 @@ public:
 			Distribution::log_probabilities(use_log);
 			if(use_log){
 				std::for_each(_distribution.begin(), _distribution.end(), 
-					[](std::pair<std::string, double>& entry) {
+					[](std::pair<const std::string, double>& entry) {
 						entry.second = log(entry.second);
 					});
 			}
 			else{
 				std::for_each(_distribution.begin(), _distribution.end(), 
-					[](std::pair<std::string, double>& entry) {
+					[](std::pair<const std::string, double>& entry) {
 						entry.second = exp(entry.second);
 					});
 			}
@@ -133,12 +133,15 @@ public:
 	}
 
 	virtual void log_normalize() {
-		if(! this->uses_log_probabilities()){
+		if(! this->uses_log_probabilities()) {
 			log_probabilities(true);
 		}
-		double probabilites_sum = ());
-		if(prob_sum() != 1.0){
-
+		double probabilities_sum = prob_sum();
+		if(exp(probabilities_sum) != 1.0){
+			std::for_each(_distribution.begin(), _distribution.end(),
+				[&probabilities_sum](std::pair<const std::string, double>& entry) {
+					entry.second = entry.second - probabilities_sum;
+				});
 		}
 	}
 

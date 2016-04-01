@@ -195,15 +195,25 @@ public:
 
 	/* Prepares the hmm before calling algorithms on it. */
 	void brew() {
+		/* Check end() and begin() exist. */
+		if(begin() == nullptr) throw StateNotFoundException(error_message::kHMMHasNoBeginState);
+		if(end() == nullptr) throw StateNotFoundException(error_message::kHMMHasNoEndState);
 		/* Get the states from graph. */
 		std::vector<State*> states = _graph.get_vertices();
 		/* Keep track of the matrix index of each state. */
-		std::map<const State*, std::size_t> states_indices;
+		std::map<const State *, std::size_t> states_indices;
+		std::size_t begin_state_index;
+		std::size_t end_state_index;
 
 		/* Raw transition matrix. */
 		Matrix<double> A(states.size());
 		/* Init one row per state and and map state to matrix index. */
 		for(std::size_t i = 0; i < states.size(); ++i) {
+			if(states[i]->is_silent()){ //--------------------------------------------------- !!!!!
+				if(*states[i]!=begin() && *states[i]!=end()) throw std::runtime_error("silent non-begin/end states not yet supported");
+				if(*states[i] == begin()) begin_state_index = i;
+				else if(*states[i] == end()) end_state_index = i;
+			} 
 			A[i] = std::vector<double>(states.size());
 			states_indices[states[i]] = i;
 		}

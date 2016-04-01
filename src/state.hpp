@@ -86,6 +86,10 @@ public:
 		return _name == other.name();
 	}
 
+	inline bool operator!=(const State& other) const {
+		return ! operator==(other);
+	}
+
 	std::string to_string() const {
 		std::string repr = _name + "(";
 		repr += (is_silent() ? "silent" : distribution().name()) + ")";
