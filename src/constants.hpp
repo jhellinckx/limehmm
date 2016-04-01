@@ -39,6 +39,7 @@ namespace error_message {
 	extern const std::string kAddTransitionStateNotFound = "tried to add a transition with a state not contained by the hmm";
 	extern const std::string kAddedTransitionFromEndState = "tried to add a transition from an end state";
 	extern const std::string kAddedTransitionToBeginState = "tried to add a transition to a begin state";
+	extern const std::string kAddedTransitionNegativeProbability = "tried to add a transition with a negative probability";
 
 	template<typename T>
 	extern std::string format(const std::string& error, const T& t) {
@@ -68,6 +69,8 @@ namespace distribution_config {
 	extern const std::string kContinuousDistributionName = "Continuous distribution";
 	extern const std::string kNormalDistributionName = "Normal distribution";
 	extern const std::string kUniformDistributionName = "Uniform distribution";
+
+	extern const bool kDefaultLogUse = false;
 }
 
 #endif

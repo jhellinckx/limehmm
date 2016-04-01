@@ -23,9 +23,9 @@ namespace utils {
 		return (log_x > log_y) ? log_x + log(1 + exp(log_y - log_x)) : log_y + log(1 + exp(log_x - log_y));
 	}
 
-	template<typename CollectionType>
-	extern double sum_log_prob(typename CollectionType::iterator begin, typename CollectionType::iterator end, double init_sum = kNegInf){
-		typename CollectionType::iterator it = begin;
+	template<typename Iterator>
+	extern double sum_log_prob(Iterator begin, Iterator end, double init_sum = kNegInf){
+		Iterator it = begin;
 		double log_sum = init_sum;
 		while(it != end){
 			log_sum = sum_log_prob(log_sum, *it);
@@ -34,11 +34,14 @@ namespace utils {
 		return log_sum;
 	}
 
-	template<typename CollectionType>
-	extern void log_normalize(typename CollectionType::iterator begin, typename CollectionType::iterator end){
-		typename CollectionType::iterator it = begin;
+	template<typename Iterator>
+	extern void log_normalize(Iterator begin, Iterator end, double log_sum){
+		Iterator it = begin;
+		while(it != end){
+			*it = *it - log_sum;
+			++it;
+		}
 	}
-
 
 	template <typename T>
 	class to_string {

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <map>
 #include <numeric>
+#include <functional>
 #include "constants.hpp"
 #include "utils.hpp"
 
@@ -29,22 +30,24 @@ public:
 class Distribution {
 private:
 	std::string _name;
-
+	bool _log;
 public:
 	Distribution() : 
 		Distribution(distribution_config::kDistributionName) {}
-	Distribution(const std::string& name) : _name(name) {}
+	Distribution(const std::string& name) : _name(name), _log(distribution_config::kDefaultLogUse) {}
 
 	virtual std::string name() const { return _name; }
 	virtual bool is_discrete() const { return false; }
 	virtual bool is_continuous() const { return false; }
-	
+	virtual bool uses_log_probabilities() const { return _log; }
+	virtual void log_probabilities(bool use_log) { _log = use_log; }
 	/* Pure virtual methods */
 	/* Get probabilities with operator[] */
 	virtual bool empty() const = 0;
 	virtual std::string to_string() const {
 		return _name;
 	}
+	virtual void log_normalize() = 0;
 	virtual double& operator[] (const std::string&) = 0;
 	virtual double& operator[] (const double&) = 0;
 	virtual bool operator==(const Distribution& other) const = 0;
@@ -83,10 +86,21 @@ public:
 	}
 
 	double prob_sum() const {
-		return std::accumulate(_distribution.begin(), _distribution.end(), double(), 
-			[](const double previous, const std::pair<std::string,double>& entry) { 
-				return previous + entry.second;
-			});
+		double init_sum;
+		std::function<double(double, const std::pair<std::string, double>&)> prob_adder;
+		if(this->uses_log_probabilities()){
+			init_sum = utils::kNegInf;
+			prob_adder = [](const double previous, const std::pair<std::string, double>& entry) { 
+							return utils::sum_log_prob(previous, entry.second);
+						};
+		}
+		else{
+			init_sum = double(0);
+			prob_adder = [](const double previous, const std::pair<std::string, double>& entry) { 
+							return previous + entry.second;
+						};
+		}
+		return std::accumulate(_distribution.begin(), _distribution.end(), double(0), prob_adder);
 	}
 
 	std::string to_string() const {
@@ -97,6 +111,35 @@ public:
 			});
 		str += "-> sum " + std::to_string(prob_sum());
 		return str;
+	}
+
+	virtual void log_probabilities(bool use_log) {
+		/* Only make changes if distriubtion not yet using what is asked. */
+		if(use_log != this->uses_log_probabilities()){
+			Distribution::log_probabilities(use_log);
+			if(use_log){
+				std::for_each(_distribution.begin(), _distribution.end(), 
+					[](std::pair<std::string, double>& entry) {
+						entry.second = log(entry.second);
+					});
+			}
+			else{
+				std::for_each(_distribution.begin(), _distribution.end(), 
+					[](std::pair<std::string, double>& entry) {
+						entry.second = exp(entry.second);
+					});
+			}
+		}
+	}
+
+	virtual void log_normalize() {
+		if(! this->uses_log_probabilities()){
+			log_probabilities(true);
+		}
+		double probabilites_sum = ());
+		if(prob_sum() != 1.0){
+
+		}
 	}
 
 	bool empty() const {

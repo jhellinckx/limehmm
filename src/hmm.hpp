@@ -162,6 +162,7 @@ public:
 	void add_transition(const State& from, const State& to, double probability){
 		if(from == end()) throw TransitionLogicException(transition_string(from, to), error_message::kAddedTransitionFromEndState);
 		if(to == begin()) throw TransitionLogicException(transition_string(from, to), error_message::kAddedTransitionToBeginState);
+		if(probability < 0) throw TransitionLogicException(transition_string(from, to), error_message::kAddedTransitionNegativeProbability);
 		try{
 			_graph.add_edge(from, to, probability);	
 		} 
@@ -212,17 +213,19 @@ public:
 			for(Edge<State>* out_edge : out_edges){
 				A[i][states_indices[out_edge->from()]] = (out_edge->weight() == nullptr) ? utils::kNegInf : log(*(out_edge->weight()));
 			}
-			double prob_sum = std::accumulate(out_edges.begin(), out_edges.end(), double(), 
+			/* Sum the probabilities to check wether a normalization is needed. */
+			double prob_sum = std::accumulate(out_edges.begin(), out_edges.end(), double(0), 
 				[](const double previous, const Edge<State>* edge) { 
 					return (edge->weight() == nullptr) ? previous : previous + *(edge->weight());
 				});
-			/* Normalize probabilities if needed. */
+			/* Normalize with log probabilities. */
 			if(prob_sum != 1.0){
-
+				utils::log_normalize(A[i].begin(), A[i].end(), log(prob_sum));
 			}
 		}
-		/* PDFs. */
+		/* Fill emission matrix with PDFs. */
 		std::vector<Distribution*> B;
+
 
 	}
 
