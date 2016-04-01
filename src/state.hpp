@@ -86,6 +86,12 @@ public:
 		return _name == other.name();
 	}
 
+	std::string to_string() const {
+		std::string repr = _name + "(";
+		repr += (is_silent() ? "silent" : distribution().name()) + ")";
+		return repr;
+	}
+
 	bool free_emission() const { return _free_emission; }
 	bool free_transition() const { return _free_transition; }
 	void freeze_emission() { _free_emission = false; }
@@ -115,9 +121,7 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& out, const State& state){
-	out << state.name() << "("
-		<< (state.is_silent() ? "silent" : state.distribution().name())
-		<< ")";
+	out << state.to_string();
 	return out;
 }
 

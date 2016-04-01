@@ -6,15 +6,30 @@
 #include <cstdlib>
 #include <cmath>
 #include <limits>
+#include <typeinfo>
+#include <type_traits>
 
 namespace utils {
 	extern const double kInf =  std::numeric_limits<double>::infinity();
 	extern const double kNegInf = -std::numeric_limits<double>::infinity();
+
+	template <typename T>
+	class func_to_string {
+		template <typename C> static char test(char[sizeof(&C::to_string)]);
+		template <typename C> static long test(...);    
+	public:
+		static bool exists() {
+			return sizeof(test<T>(0)) == sizeof(char);	
+		}
+	};
 }
 
 namespace error_message {
 	/* Graph */
+	extern const std::string kGetVertexNotFound = "tried to get a vertex but it was not found in the graph";
+	extern const std::string kRemoveVertexNotFound = "tried to remove a vertex but it was not found in the graph";
 	extern const std::string kVertexNotFound = "vertex was not found in graph";
+	extern const std::string kRemoveEdgeNotFound = "tried to remove an edge but it was not found in the graph";
 	extern const std::string kEdgeNotFound = "edge was not found in graph";
 	extern const std::string kIncidentVertexNotFound = "tried to add an edge but one of its incident vertex was not found in the graph";
 	extern const std::string kAddedVertexExists = "tried to add a vertex but an equal vertex was found in the graph";
@@ -25,8 +40,15 @@ namespace error_message {
 
 	/* Distribution */
 	extern const std::string kDistributionSymbolNotFound = "symbol not found in distribution";
-	
+
 	/* HMM */
+	extern const std::string kHMMHasNoBeginState = "no begin state was found, maybe it has been removed ?";
+	extern const std::string kHMMHasNoEndState = "no end state was found, maybe it has been removed ?";
+	extern const std::string kHMMRemoveStateNotFound = "tried to remove a state not contained by the hmm";
+	extern const std::string kHMMRemoveTransitionNotFound = "tried to remove a transition not contained by the hmm";
+	extern const std::string kHMMAddStateExists = "tried to add a state already contained by the hmm";
+	extern const std::string kHMMAddTransitionExists = "tried to add a transition already contained by the hmm";
+	extern const std::string kAddTransitionStateNotFound = "tried to add a transition with a state not contained by the hmm";
 
 	template<typename T>
 	extern std::string format(const std::string& error, const T& t) {

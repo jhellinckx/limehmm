@@ -13,43 +13,55 @@
 
 class GraphException : public std::logic_error {
 protected:
-	GraphException(const std::string& message) :
-		std::logic_error(message) {}
+	GraphException(const std::string& message) : std::logic_error(message) {}
+public:
+	virtual bool has_trigger() const { return false; }
 };
 
-class VertexNotFoundException : public GraphException {
+template<typename T>
+class HasTriggerGraphException : public GraphException {
+	T _trigger;
+protected:
+	HasTriggerGraphException(const T& t, const std::string& message) : 
+		GraphException(error_message::format(message, t)), _trigger(t) {}
 public:
-	template<typename T>
-	VertexNotFoundException(const T& t) : 
-		GraphException(error_message::format("VertexNotFoundException: " + error_message::kVertexNotFound, t)) {}
+	virtual bool has_trigger() const { return true; }
+	virtual T trigger() const { return _trigger; }
 };
 
-class EdgeNotFoundException : public GraphException {
+template<typename T>
+class VertexNotFoundException : public HasTriggerGraphException<T> {
 public:
-	template<typename T>
-	EdgeNotFoundException(const T& t) : 
-		GraphException(error_message::format("EdgeNotFoundException: " + error_message::kEdgeNotFound, t)) {}
+	VertexNotFoundException(const T& t, const std::string& message) : 
+		HasTriggerGraphException<T>(t, "VertexNotFoundException: " + message) {}
 };
 
-class VertexExistsException : public GraphException {
+template<typename T>
+class EdgeNotFoundException : public HasTriggerGraphException<T> {
 public:
-	template<typename T>
-	VertexExistsException(const T& t) : 
-		GraphException(error_message::format("VertexExistsException: " + error_message::kAddedVertexExists, t)) {}
+	EdgeNotFoundException(const T& t, const std::string& message) : 
+		HasTriggerGraphException<T>(t, "EdgeNotFoundException: " + message) {}
 };
 
-class EdgeExistsException : public GraphException {
+template<typename T>
+class VertexExistsException : public HasTriggerGraphException<T> {
 public:
-	template<typename T>
-	EdgeExistsException(const T& t) : 
-		GraphException(error_message::format("EdgeExistsException: " + error_message::kAddedEdgeExists, t)) {}
+	VertexExistsException(const T& t, const std::string& message) : 
+		HasTriggerGraphException<T>(t, "VertexExistsException: " + message) {}
 };
 
-class IncidentVertexNotFoundException : public GraphException {
+template<typename T>
+class EdgeExistsException : public HasTriggerGraphException<T> {
 public:
-	template<typename T>
-	IncidentVertexNotFoundException(const T& t) :
-		GraphException(error_message::format("IncidentVertexNotFoundException: " + error_message::kIncidentVertexNotFound, t)) {}
+	EdgeExistsException(const T& t, const std::string& message) : 
+		HasTriggerGraphException<T>(t, "EdgeExistsException: " + message) {}
+};
+
+template<typename T>
+class IncidentVertexNotFoundException : public HasTriggerGraphException<T> {
+public:
+	IncidentVertexNotFoundException(const T& t, const std::string& message) :
+		HasTriggerGraphException<T>(t, "IncidentVertexNotFoundException: " + message) {}
 };
 
 /* <----------------------------> */
@@ -174,7 +186,7 @@ class Graph{
 	}
 
 	bool _adjacent(const VertexElementBase& first, const VertexElementBase& second) const {
-		return contains(Edge<VertexElementBase>(first, second)) || contains(Edge<VertexElementBase>(second, first));
+		return has_edge(Edge<VertexElementBase>(first, second)) || has_edge(Edge<VertexElementBase>(second, first));
 	}
 
 	std::vector<VertexElementBase*>& _all_vertices() const {
@@ -189,20 +201,20 @@ class Graph{
 	else throws an exception. */
 	template<typename VertexElementDerived>
 	void _add_vertex(const VertexElementDerived& vertex){
-		if(! contains(vertex)){
+		if(! has_vertex(vertex)){
 			_vertices.reserve(_vertices.size() + 1); // Avoid memory leak if push_back throws an exception
 			_vertices.push_back(new VertexElementDerived(vertex));
 		}
 		
 		else{
-			throw VertexExistsException(vertex);
+			throw VertexExistsException<VertexElementDerived>(vertex, error_message::kAddedVertexExists);
 		}
 	}
 
 	/* Removes a vertex if it is contained by the graph,
 	else throws an exception. */
 	void _remove_vertex(const VertexElementBase& vertex){
-		if(contains(vertex)){
+		if(has_vertex(vertex)){
 			_remove_all_edges(vertex);
 			_vertices.erase(std::remove_if(_vertices.begin(), _vertices.end(), 
 						[&vertex](const VertexElementBase* maybe_vertex){
@@ -214,7 +226,7 @@ class Graph{
 						}), _vertices.end());
 		}
 		else{
-			throw VertexNotFoundException(vertex);
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kRemoveVertexNotFound);
 		}
 	}
 
@@ -233,7 +245,7 @@ class Graph{
 	/* Removes an edge if it is contained by the graph,
 	else throws an exception. */
 	void _remove_edge(const Edge<VertexElementBase>& edge){
-		if(contains(edge)){
+		if(has_edge(edge)){
 			_edges.erase(std::remove_if(_edges.begin(), _edges.end(), 
 						[&edge](const Edge<VertexElementBase>* maybe_edge){
 							if(edge == *maybe_edge){
@@ -244,7 +256,7 @@ class Graph{
 						}), _edges.end());
 		}
 		else{
-			throw EdgeNotFoundException(edge);
+			throw EdgeNotFoundException<Edge<VertexElementBase>>(edge, error_message::kRemoveEdgeNotFound);
 		}
 	}
 
@@ -253,22 +265,22 @@ class Graph{
 	If an incident vertex is not contained by the graph, 
 	throws en exception. */
 	void _add_edge(const Edge<VertexElementBase>& edge){
-		if(! contains(*(edge.from()))) throw IncidentVertexNotFoundException(*(edge.from()));
-		if(! contains(*(edge.to()))) throw IncidentVertexNotFoundException(*(edge.to()));
+		if(! has_vertex(*(edge.from()))) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.from()), error_message::kIncidentVertexNotFound);
+		if(! has_vertex(*(edge.to()))) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.to()), error_message::kIncidentVertexNotFound);
 		
-		if(! contains(edge)){
+		if(! has_edge(edge)){
 			_edges.reserve(_edges.size() + 1);
 			_edges.push_back(new Edge<VertexElementBase>(edge));
 		}
 		else{
-			throw EdgeExistsException(edge);
+			throw EdgeExistsException<Edge<VertexElementBase>>(edge, error_message::kAddedEdgeExists);
 		}
 	}
 
 	/* Returns the successors of the given vertex. Throws an exception if the 
 	given vertex is not contained by the graph. */
 	std::vector<VertexElementBase*> _get_out_vertices(const VertexElementBase& vertex) const {
-		if(contains(vertex)){
+		if(has_vertex(vertex)){
 			std::vector<VertexElementBase*> out_vertices;
 			std::for_each(_edges.begin(), _edges.end(),
 							[&vertex, &out_vertices](const Edge<VertexElementBase>* edge){
@@ -279,14 +291,14 @@ class Graph{
 			return out_vertices;	
 		}
 		else{
-			throw VertexNotFoundException(vertex);
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kGetVertexNotFound);
 		}
 	}
 
 	/* Returns the predecessors of the given vertex. Throws an exception if the 
 	given vertex is not contained by the graph. */
 	std::vector<VertexElementBase*> _get_in_vertices(const VertexElementBase& vertex) const {
-		if(contains(vertex)){
+		if(has_vertex(vertex)){
 			std::vector<VertexElementBase*> in_vertices;
 			std::for_each(_edges.begin(), _edges.end(),
 							[&vertex, &in_vertices](const Edge<VertexElementBase>* edge){
@@ -297,7 +309,7 @@ class Graph{
 			return in_vertices;
 		}
 		else{
-			throw VertexNotFoundException(vertex);
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kGetVertexNotFound);
 		}
 	}
 
@@ -355,12 +367,16 @@ public:
 		return _all_edges();
 	}
 
-	bool contains(const VertexElementBase& vertex) const {
+	bool has_vertex(const VertexElementBase& vertex) const {
 		return _find_vertex(vertex) != _vertices.end();
 	}
 
-	bool contains(const Edge<VertexElementBase>& edge) const {
+	bool has_edge(const Edge<VertexElementBase>& edge) const {
 		return _find_edge(edge) != _edges.end();
+	}
+
+	bool has_edge(const VertexElementBase& from_vertex, const VertexElementBase& to_vertex) const {
+		return has_edge(Edge<VertexElementBase>(from_vertex, to_vertex));
 	}
 
 	bool adjacent(const VertexElementBase& first, const VertexElementBase& second) const {
@@ -373,7 +389,7 @@ public:
 			return *it;
 		}
 		else{
-			throw VertexNotFoundException(vertex);
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kGetVertexNotFound);
 		}
 	}
 

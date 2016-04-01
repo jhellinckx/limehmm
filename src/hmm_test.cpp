@@ -163,26 +163,38 @@ int main(){
 			"begin/end state",
 			State begin("begin");
 			State end("end");
+			/* Construct hmm by specifying begin and end state. */
 			HiddenMarkovModel hmm = HiddenMarkovModel(begin, end);
 			ASSERT(hmm.begin() == begin);
 			ASSERT(hmm.end() == end);
-			ASSERT(hmm.contains(begin));
-			ASSERT(hmm.contains(end));
+			/* Check if the begin/end states were added to the hmm. */
+			ASSERT(hmm.has_state(begin));
+			ASSERT(hmm.has_state(end));
+			/* Currently removing the begin state is allowed. */ //TODO
+			hmm.remove_state(begin);
+			ASSERT(!hmm.has_state(begin));
+			/* Accessing begin when it has been removed throws an exception. */
+			ASSERT_EXCEPT(hmm.begin(), StateNotFoundException);
 		)
 
 		TEST_UNIT(
 			"add/remove state",
 			HiddenMarkovModel hmm = HiddenMarkovModel();
 			State s("s");
-			ASSERT(!hmm.contains("s"));
-			ASSERT(!hmm.contains(s));
+			/* Not yet added */
+			ASSERT(!hmm.has_state("s"));
+			ASSERT(!hmm.has_state(s));
 			hmm.add_state(s);
-			ASSERT(hmm.contains("s"));
-			ASSERT(hmm.contains(s));
-			ASSERT_EXCEPT(hmm.add_state(s), VertexExistsException);
+			/* Check if the state was added to the hmm. */
+			ASSERT(hmm.has_state("s"));
+			ASSERT(hmm.has_state(s));
+			/* Try to add an existing state. */
+			ASSERT_EXCEPT(hmm.add_state(s), StateExistsException);
 			hmm.remove_state("s");
-			ASSERT(!hmm.contains("s"));
-			ASSERT(!hmm.contains(s));
+			/* Remove a state not contained by the hmm. */
+			ASSERT_EXCEPT(hmm.remove_state("s"), StateNotFoundException);
+			ASSERT(!hmm.has_state("s"));
+			ASSERT(!hmm.has_state(s));
 		)
 
 		TEST_UNIT(
@@ -190,8 +202,26 @@ int main(){
 			HiddenMarkovModel hmm = HiddenMarkovModel();
 			State s1("s1");
 			State s2("s2");
-
 			hmm.add_state(s1);
+			/* Throw an exception when a transition is added with a state not contained by the hmm. */
+			ASSERT_EXCEPT(hmm.add_transition(s1, s2, 0.3), StateNotFoundException);
+			hmm.add_state(s2);
+			/* State is added, transition OK. */
+			hmm.add_transition(s1, s2, 0.3);
+			/* Check if transition exists. */
+			ASSERT(hmm.has_transition(s1, s2));
+			ASSERT(!hmm.has_transition(s2, s1));
+			/* Removing it twice throws an exception. */
+			hmm.remove_transition(s1, s2);
+			ASSERT_EXCEPT(hmm.remove_transition(s1, s2), TransitionNotFoundException);
+			/* Check successful removal. */
+			ASSERT(!hmm.has_transition(s1, s2));
+			/* Re-add it. */
+			hmm.add_transition(s1, s2, 0.3);
+			ASSERT(hmm.has_transition(s1, s2));
+			/* Removing a state removes its transitions from and to other states. */
+			hmm.remove_state(s1);
+			ASSERT(!hmm.has_transition(s1, s2));
 		)
 
 		/* Emission */

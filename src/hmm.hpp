@@ -12,6 +12,51 @@
 #include "state.hpp"
 #include "graph.hpp"
 
+/* <-------- Exceptions --------> */
+
+class HMMException : public std::logic_error {
+protected:
+	HMMException(const std::string& message) :
+		std::logic_error(message) {}
+};
+
+class StateNotFoundException : public HMMException {
+public:
+	template<typename T>
+	StateNotFoundException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("StateNotFoundException: " + msg, t)) {}
+
+	StateNotFoundException(const std::string& msg) : 
+		HMMException("StateNotFoundException: " + msg) {}
+};
+
+class TransitionNotFoundException : public HMMException {
+public:
+	template<typename T>
+	TransitionNotFoundException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("TransitionNotFoundException: " + msg, t)) {}
+
+	TransitionNotFoundException(const std::string& msg) : 
+		HMMException("TransitionNotFoundException: " + msg) {}
+};
+
+class StateExistsException : public HMMException {
+public:
+	template<typename T>
+	StateExistsException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("StateExistsException: " + msg, t)) {}
+};
+
+class TransitionExistsException : public HMMException {
+public:
+	template<typename T>
+	TransitionExistsException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("TransitionExistsException: " + msg, t)) {}
+};
+
+
+/* <----------------------------> */
+
 template<typename T>
 using Matrix = std::vector<std::vector<T>>;
 
@@ -60,8 +105,12 @@ public:
 	std::size_t num_states() const { return _graph.num_vertices(); }
 	std::size_t num_transitions() const { return _graph.num_edges(); }	
 
-	bool contains(const State& state) const {
-		return _graph.contains(state);
+	bool has_state(const State& state) const {
+		return _graph.has_vertex(state);
+	}
+
+	bool has_transition(const State& from_state, const State& to_state) const {
+		return _graph.has_edge(from_state, to_state);
 	}
 
 	State& begin() { 
@@ -69,7 +118,7 @@ public:
 			return *_begin;
 		}
 		else{
-			throw std::logic_error("No beginning");
+			throw StateNotFoundException(error_message::kHMMHasNoBeginState);
 		}
 	}
 
@@ -78,30 +127,59 @@ public:
 			return *_end;
 		}
 		else{
-			throw std::logic_error("No end");
+			throw StateNotFoundException(error_message::kHMMHasNoEndState);
 		}
 	}
 
 	/* See behavior of Graph::add_vertex() */	
 	void add_state(const State& state){
-		_graph.add_vertex(state);
+		try{
+			_graph.add_vertex(state);	
+		}
+		catch(const VertexExistsException<State>& e){
+			throw StateExistsException(e.trigger(), error_message::kHMMAddStateExists);
+		}
 	}
 
 	/* See behavior of Graph::remove_vertex() */
 	void remove_state(const State& state){
 		if(state == *_begin) _begin = nullptr;
 		else if(state == *_end) _end = nullptr;
-		_graph.remove_vertex(state);
+		try{
+			_graph.remove_vertex(state);	
+		}
+		catch(const VertexNotFoundException<State>& e){
+			throw StateNotFoundException(e.trigger(), error_message::kHMMRemoveStateNotFound);
+		}
+	}
+
+	std::string transition_string(const State& from, const State& to) const {
+		return from.to_string() + " -> " + to.to_string();
 	}
 
 	/* See behavior of Graph::add_edge() */
 	void add_transition(const State& from, const State& to, double probability){
-		_graph.add_edge(from, to, probability);
+		try{
+			_graph.add_edge(from, to, probability);	
+		} 
+		catch(const EdgeExistsException<Edge<State>>& e){
+			throw TransitionExistsException(transition_string(*(e.trigger().from()), *(e.trigger().to())), error_message::kHMMAddTransitionExists);
+		}
+		catch(const IncidentVertexNotFoundException<State>& e){
+			throw StateNotFoundException(e.trigger(), error_message::kAddTransitionStateNotFound);
+		}
+		
 	}
 
 	/* See behavior of Graph::remove_edge() */
 	void remove_transition(const State& from, const State& to){
-		_graph.remove_edge(from, to);
+		try{
+			_graph.remove_edge(from, to);	
+		}
+		catch(const EdgeNotFoundException<Edge<State>>& e){
+			throw TransitionNotFoundException(transition_string(*(e.trigger().from()), *(e.trigger().to())), error_message::kHMMRemoveTransitionNotFound);
+		}
+		
 	}
 
 	/* Prepares the hmm before calling algorithms on it */
