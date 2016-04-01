@@ -12,6 +12,8 @@
 #include "state.hpp"
 #include "graph.hpp"
 
+typedef std::vector<std::vector<double>> Matrix;
+
 /* <-------- Exceptions --------> */
 
 class HMMException : public std::logic_error {
@@ -54,11 +56,7 @@ public:
 		HMMException(error_message::format("TransitionExistsException: " + msg, t)) {}
 };
 
-
 /* <----------------------------> */
-
-template<typename T>
-using Matrix = std::vector<std::vector<T>>;
 
 class HiddenMarkovModel{
 private:
@@ -71,13 +69,6 @@ private:
 
 	/* Holds the states and the transitions when building the hmm */
 	Graph<State> _graph;
-
-	/* Fields initialized after brew(). 
-	These fields are mainly used by hmm algorithms. */
-	/* Transition matrix */
-	Matrix<double> _A;
-	/* Distributions set */
-	std::vector<Distribution> _B;
 
 public:
 	/* Default constructor. Inits an empty hmm with default values. */
@@ -189,18 +180,25 @@ public:
 		
 	}
 
-	/* Prepares the hmm before calling algorithms on it */
+	/* Prepares the hmm before calling algorithms on it. */
 	void brew() {
-		// /* Init raw emission and transition matrices */
-		// std::vector<State*>& states = _graph.get_vertices();
-		// std::for_each(states.begin(), states.end(),
-		// 				[&_A, &_B]
-		// /* Normalize transitions */
-		// std::vector<State*>& states = _graph.get_vertices();
-		// std::for_each(states.begin(), states.end(),
-		// 				[_A, _B]
+		/* Keep track of each state in the matrix. */
+		std::map<std::size_t, State*> _states_indices;
+		/* Transition matrix. */
+		Matrix A;
+		/* PDFs. */
+		std::vector<Distribution*> B;
+		/* Init raw emission and transition matrices. */
+		std::vector<State*> states = _graph.get_vertices();
+		states[0]->set_name("lol");
+		std::cout << states[0]->distribution() << std::endl;
 
-		// /* Normalize emissions */
+		std::vector<State*> neighbours = _graph.get_neighbours(State("s1"));
+		std::vector<State*> in = _graph.get_in_vertices(State("s1"));
+		std::vector<State*> out = _graph.get_out_vertices(State("s1"));
+		/* Normalize transitions */
+
+		/* Normalize emissions */
 	}
 
 	void sample() {

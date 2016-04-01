@@ -68,8 +68,8 @@ public:
 
 template<typename VertexElementBase>
 class Edge{
-	const VertexElementBase* _from;
-	const VertexElementBase* _to;
+	const VertexElementBase * const _from;
+	const VertexElementBase * const _to;
 	std::string _label;
 	
 	double* _weight;
@@ -189,11 +189,11 @@ class Graph{
 		return has_edge(Edge<VertexElementBase>(first, second)) || has_edge(Edge<VertexElementBase>(second, first));
 	}
 
-	std::vector<VertexElementBase*>& _all_vertices() const {
+	std::vector<VertexElementBase*> _all_vertices() const {
 		return _vertices;
 	}
 
-	std::vector<Edge<VertexElementBase>*>& _all_edges() const {
+	std::vector<Edge<VertexElementBase>*> _all_edges() const {
 		return _edges;
 	}
 
@@ -285,7 +285,7 @@ class Graph{
 			std::for_each(_edges.begin(), _edges.end(),
 							[&vertex, &out_vertices](const Edge<VertexElementBase>* edge){
 								if(edge->incidents_from(vertex)){
-									out_vertices.push_back(edge->to());
+									out_vertices.push_back(const_cast<VertexElementBase*>(edge->to()));
 								}
 							});
 			return out_vertices;	
@@ -303,7 +303,7 @@ class Graph{
 			std::for_each(_edges.begin(), _edges.end(),
 							[&vertex, &in_vertices](const Edge<VertexElementBase>* edge){
 								if(edge->incidents_to(vertex)){
-									in_vertices.push_back(edge->from());
+									in_vertices.push_back(const_cast<VertexElementBase*>(edge->from()));
 								}
 							});
 			return in_vertices;
@@ -320,9 +320,9 @@ class Graph{
 		std::vector<VertexElementBase*> in = _get_in_vertices(vertex);
 		out.reserve(out.size() + in.size());
 		std::for_each(in.begin(), in.end(),
-						[&out](const VertexElementBase* in_vertex){
+						[&out](VertexElementBase* in_vertex){
 							if(std::find_if(out.begin(), out.end(),
-								[in_vertex](const VertexElementBase* out_vertex) {
+								[in_vertex](VertexElementBase* out_vertex) {
 									return *in_vertex == *out_vertex;
 								}) == out.end()) {
 									out.push_back(in_vertex);
@@ -359,11 +359,11 @@ public:
 	std::size_t num_vertices() const { return _vertices.size(); }
 	std::size_t num_edges() const { return _edges.size(); }
 
-	std::vector<VertexElementBase*>& get_vertices() const { 
+	std::vector<VertexElementBase*> get_vertices() const { 
 		return _all_vertices();
 	}
 
-	std::vector<Edge<VertexElementBase>*>& get_edges() const {
+	std::vector<Edge<VertexElementBase>*> get_edges() const {
 		return _all_edges();
 	}
 

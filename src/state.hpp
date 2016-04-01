@@ -109,6 +109,7 @@ public:
 	}
 
 	std::string name() const { return _name; }
+	void set_name(const std::string& name) { _name = name; }   
 
 	bool is_silent() const { 
 		return _distribution == nullptr || _distribution->empty();
