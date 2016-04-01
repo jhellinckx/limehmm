@@ -24,19 +24,19 @@ namespace utils {
 	}
 
 	template<typename CollectionType>
-	extern const double sum_log_prob(CollectionType::iterator begin, CollectionType::iterator end, double init_sum = 0){
+	extern const double sum_log_prob(CollectionType::iterator begin, CollectionType::iterator end, double init_sum = kNegInf){
 		CollectionType::iterator it = begin;
 		double log_sum = init_sum;
 		while(it != end){
 			log_sum = sum_log_prob(log_sum, *it);
-			it++;
+			++it;
 		}
 		return log_sum;
 	}
 
 
 	template <typename T>
-	class func_to_string {
+	class to_string {
 		template <typename C> static char test(char[sizeof(&C::to_string)]);
 		template <typename C> static long test(...);    
 	public:
