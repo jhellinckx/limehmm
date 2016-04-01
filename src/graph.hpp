@@ -190,6 +190,9 @@ class Graph{
 	}
 
 	std::vector<VertexElementBase*> _all_vertices() const {
+		for(VertexElementBase* vertex : _vertices){
+			std::cout << vertex->to_string() << std::endl;
+		}
 		return _vertices;
 	}
 

@@ -195,9 +195,6 @@ public:
 
 	/* Prepares the hmm before calling algorithms on it. */
 	void brew() {
-		/* Check end() and begin() exist. */
-		if(begin() == nullptr) throw StateNotFoundException(error_message::kHMMHasNoBeginState);
-		if(end() == nullptr) throw StateNotFoundException(error_message::kHMMHasNoEndState);
 		/* Get the states from graph. */
 		std::vector<State*> states = _graph.get_vertices();
 		/* Keep track of the matrix index of each state. */
@@ -233,10 +230,22 @@ public:
 				utils::log_normalize(A[i].begin(), A[i].end(), log(prob_sum));
 			}
 		}
-		/* Fill emission matrix with PDFs. */
-		std::vector<Distribution*> B;
+		/* Fill emission matrix with the states PDFs. */
+		std::vector<Distribution*> B(states.size());
+		for(const State* state : states){
+			if(! state->is_silent()){
+				 Distribution* distribution = state->distribution().clone();
+				 distribution->log_normalize();
+				 B[states_indices[state]] = distribution;
+			}
+			else{
+				B[states_indices[state]] = nullptr;
+			}
 
-
+		}
+		for(Distribution* dist : B){
+			if(dist != nullptr) delete dist;
+		}
 	}
 
 	void sample() {

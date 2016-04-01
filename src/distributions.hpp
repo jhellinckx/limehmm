@@ -159,6 +159,9 @@ public:
 	}
 
 	virtual double& operator[] (const std::string& symbol) {
+		if(!contains(symbol)){
+			_distribution[symbol] = (this->uses_log_probabilities()) ? utils::kNegInf : 0.0;
+		}
 		return _distribution[symbol];
 	}
 
@@ -167,7 +170,7 @@ public:
 	}
 
 	virtual bool operator==(const DiscreteDistribution& other) const {
-		return (other.name() == this->name()) && (other._distribution == _distribution);
+		return (other.name() == this->name()) && (other.uses_log_probabilities() == other.uses_log_probabilities()) && (other._distribution == _distribution);
 	}
 
 	virtual bool operator==(const Distribution& other) const {

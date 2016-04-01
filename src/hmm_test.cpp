@@ -240,6 +240,16 @@ int main(){
 			ASSERT(hmm.has_transition(hmm.begin(), s2));
 		)
 
+		TEST_UNIT(
+			"brew",
+			HiddenMarkovModel hmm;
+			DiscreteDistribution dist1 = DiscreteDistribution({{"A",0.3}, {"T", 0.2}, {"G", 0.5}});
+			hmm.add_state(State("s1", dist1));
+			dist1["C"] = 0.3;
+			hmm.add_state(State("s2", dist1));
+			hmm.brew();
+		)
+
 		/* Backward */
 
 		/* Forward */
