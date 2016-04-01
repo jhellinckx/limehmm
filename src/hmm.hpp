@@ -8,11 +8,14 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <math.h>
 #include "constants.hpp"
 #include "state.hpp"
 #include "graph.hpp"
+#include "utils.hpp"
 
-typedef std::vector<std::vector<double>> Matrix;
+template<typename Elem>
+using Matrix = std::vector<std::vector<Elem>>;
 
 /* <-------- Exceptions --------> */
 
@@ -32,6 +35,13 @@ public:
 		HMMException("StateNotFoundException: " + msg) {}
 };
 
+class StateExistsException : public HMMException {
+public:
+	template<typename T>
+	StateExistsException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("StateExistsException: " + msg, t)) {}
+};
+
 class TransitionNotFoundException : public HMMException {
 public:
 	template<typename T>
@@ -42,18 +52,18 @@ public:
 		HMMException("TransitionNotFoundException: " + msg) {}
 };
 
-class StateExistsException : public HMMException {
-public:
-	template<typename T>
-	StateExistsException(const T& t, const std::string& msg) : 
-		HMMException(error_message::format("StateExistsException: " + msg, t)) {}
-};
-
 class TransitionExistsException : public HMMException {
 public:
 	template<typename T>
 	TransitionExistsException(const T& t, const std::string& msg) : 
 		HMMException(error_message::format("TransitionExistsException: " + msg, t)) {}
+};
+
+class TransitionLogicException : public HMMException {
+public:
+	template<typename T>
+	TransitionLogicException(const T& t, const std::string& msg) : 
+		HMMException(error_message::format("TransitionLogicException: " + msg, t)) {}
 };
 
 /* <----------------------------> */
@@ -150,6 +160,8 @@ public:
 
 	/* See behavior of Graph::add_edge() */
 	void add_transition(const State& from, const State& to, double probability){
+		if(from == end()) throw TransitionLogicException(transition_string(from, to), error_message::kAddedTransitionFromEndState);
+		if(to == begin()) throw TransitionLogicException(transition_string(from, to), error_message::kAddedTransitionToBeginState);
 		try{
 			_graph.add_edge(from, to, probability);	
 		} 
@@ -166,7 +178,7 @@ public:
 	}
 
 	void end_transition(const State& state, double probability) {
-		add_transition(end(), state, probability);
+		add_transition(state, end(), probability);
 	}
 
 	/* See behavior of Graph::remove_edge() */
@@ -182,23 +194,36 @@ public:
 
 	/* Prepares the hmm before calling algorithms on it. */
 	void brew() {
-		/* Keep track of each state in the matrix. */
-		std::map<std::size_t, State*> _states_indices;
-		/* Transition matrix. */
-		Matrix A;
+		/* Get the states from graph. */
+		std::vector<State*> states = _graph.get_vertices();
+		/* Keep track of the matrix index of each state. */
+		std::map<const State*, std::size_t> states_indices;
+
+		/* Raw transition matrix. */
+		Matrix<double> A(states.size());
+		/* Init one row per state and and map state to matrix index. */
+		for(std::size_t i = 0; i < states.size(); ++i) {
+			A[i] = std::vector<double>(states.size());
+			states_indices[states[i]] = i;
+		}
+		/* Fill transition matrix with log probabilities. */
+		for(std::size_t i = 0; i < states.size(); ++i) {
+			std::vector<Edge<State>*> out_edges = _graph.get_out_edges(*(states[i]));
+			for(Edge<State>* out_edge : out_edges){
+				A[i][states_indices[out_edge->from()]] = (out_edge->weight() == nullptr) ? utils::kNegInf : log(*(out_edge->weight()));
+			}
+			double prob_sum = std::accumulate(out_edges.begin(), out_edges.end(), double(), 
+				[](const double previous, const Edge<State>* edge) { 
+					return (edge->weight() == nullptr) ? previous : previous + *(edge->weight());
+				});
+			/* Normalize probabilities if needed. */
+			if(prob_sum != 1.0){
+
+			}
+		}
 		/* PDFs. */
 		std::vector<Distribution*> B;
-		/* Init raw emission and transition matrices. */
-		std::vector<State*> states = _graph.get_vertices();
-		states[0]->set_name("lol");
-		std::cout << states[0]->distribution() << std::endl;
 
-		std::vector<State*> neighbours = _graph.get_neighbours(State("s1"));
-		std::vector<State*> in = _graph.get_in_vertices(State("s1"));
-		std::vector<State*> out = _graph.get_out_vertices(State("s1"));
-		/* Normalize transitions */
-
-		/* Normalize emissions */
 	}
 
 	void sample() {

@@ -6,6 +6,7 @@
 #include <map>
 #include <numeric>
 #include "constants.hpp"
+#include "utils.hpp"
 
 
 /* <-------- Exceptions --------> */

@@ -332,6 +332,38 @@ class Graph{
 		return out;
 	}
 
+	std::vector<Edge<VertexElementBase>*> _get_out_edges(const VertexElementBase& vertex) const {
+		if(has_vertex(vertex)){
+			std::vector<Edge<VertexElementBase>*> out_edges;
+			std::for_each(_edges.begin(), _edges.end(),
+							[&vertex, &out_edges](Edge<VertexElementBase>* edge){
+								if(edge->incidents_from(vertex)){
+									out_edges.push_back(edge);
+								}
+							});
+			return out_edges;
+		}
+		else{
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kGetOutEdgesVertexNotFound);
+		}
+	}
+
+	std::vector<Edge<VertexElementBase>*> _get_in_edges(const VertexElementBase& vertex) const {
+		if(has_vertex(vertex)){
+			std::vector<Edge<VertexElementBase>*> in_edges;
+			std::for_each(_edges.begin(), _edges.end(),
+							[&vertex, &in_edges](Edge<VertexElementBase>* edge){
+								if(edge->incidents_to(vertex)){
+									in_edges.push_back(edge);
+								}
+							});
+			return in_edges;
+		}
+		else{
+			throw VertexNotFoundException<VertexElementBase>(vertex, error_message::kGetInEdgesVertexNotFound);
+		}
+	}
+
 	/* Removes all the edges. Deletes the dynamically allocated edges before
 	calling the standard clear on the vector. */
 	void _clear_all_edges() {
@@ -431,6 +463,14 @@ public:
 
 	std::vector<VertexElementBase*> get_neighbours(const VertexElementBase& vertex) const {
 		return _get_neighbours(vertex);
+	}
+
+	std::vector<Edge<VertexElementBase>*> get_in_edges(const VertexElementBase& vertex) const {
+		return _get_in_edges(vertex);
+	}
+
+	std::vector<Edge<VertexElementBase>*> get_out_edges(const VertexElementBase& vertex) const {
+		return _get_out_edges(vertex);
 	}
 
 	void clear_all_edges() {

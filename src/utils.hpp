@@ -13,7 +13,7 @@ namespace utils {
 	extern const double kInf =  std::numeric_limits<double>::infinity();
 	extern const double kNegInf = -std::numeric_limits<double>::infinity();
 
-	extern const double sum_log_prob(double log_x, double log_y){
+	extern double sum_log_prob(double log_x, double log_y){
 		// prob(x) == inf, prob(y) == inf
 		if(log_x == kInf or log_y == kInf) return kInf;
 		// prob(x) == 0
@@ -24,14 +24,19 @@ namespace utils {
 	}
 
 	template<typename CollectionType>
-	extern const double sum_log_prob(CollectionType::iterator begin, CollectionType::iterator end, double init_sum = kNegInf){
-		CollectionType::iterator it = begin;
+	extern double sum_log_prob(typename CollectionType::iterator begin, typename CollectionType::iterator end, double init_sum = kNegInf){
+		typename CollectionType::iterator it = begin;
 		double log_sum = init_sum;
 		while(it != end){
 			log_sum = sum_log_prob(log_sum, *it);
 			++it;
 		}
 		return log_sum;
+	}
+
+	template<typename CollectionType>
+	extern void log_normalize(typename CollectionType::iterator begin, typename CollectionType::iterator end){
+		typename CollectionType::iterator it = begin;
 	}
 
 

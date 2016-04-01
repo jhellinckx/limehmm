@@ -9,24 +9,12 @@
 #include <typeinfo>
 #include <type_traits>
 
-namespace utils {
-	extern const double kInf =  std::numeric_limits<double>::infinity();
-	extern const double kNegInf = -std::numeric_limits<double>::infinity();
-
-	template <typename T>
-	class func_to_string {
-		template <typename C> static char test(char[sizeof(&C::to_string)]);
-		template <typename C> static long test(...);    
-	public:
-		static bool exists() {
-			return sizeof(test<T>(0)) == sizeof(char);	
-		}
-	};
-}
-
 namespace error_message {
 	/* Graph */
 	extern const std::string kGetVertexNotFound = "tried to get a vertex but it was not found in the graph";
+	extern const std::string kGetEdgeNotFound = "tried to get an edge but it was not found in the graph";
+	extern const std::string kGetOutEdgesVertexNotFound = "tried to get out edges for vertex but vertex was not found in the graph";
+	extern const std::string kGetInEdgesVertexNotFound = "tried to get in edges for vertex but vertex was not found in the graph";
 	extern const std::string kRemoveVertexNotFound = "tried to remove a vertex but it was not found in the graph";
 	extern const std::string kVertexNotFound = "vertex was not found in graph";
 	extern const std::string kRemoveEdgeNotFound = "tried to remove an edge but it was not found in the graph";
@@ -49,6 +37,8 @@ namespace error_message {
 	extern const std::string kHMMAddStateExists = "tried to add a state already contained by the hmm";
 	extern const std::string kHMMAddTransitionExists = "tried to add a transition already contained by the hmm";
 	extern const std::string kAddTransitionStateNotFound = "tried to add a transition with a state not contained by the hmm";
+	extern const std::string kAddedTransitionFromEndState = "tried to add a transition from an end state";
+	extern const std::string kAddedTransitionToBeginState = "tried to add a transition to a begin state";
 
 	template<typename T>
 	extern std::string format(const std::string& error, const T& t) {
@@ -68,6 +58,8 @@ namespace hmm_config {
 	extern const int kDefaultEmissionProbability = 0;
 	extern const std::string kDefaultStartStateLabel = "begin_";
 	extern const std::string kDefaultEndStateLabel = "end_";
+
+	extern const int kDoublePrecision = 8;
 }
 
 namespace distribution_config {
