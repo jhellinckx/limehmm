@@ -224,23 +224,35 @@ int main(){
 			ASSERT(!hmm.has_transition(s1, s2));
 		)
 
-		/* Emission */
-
-		/* Initial probability aka pi */
+		TEST_UNIT(
+			"initial probability aka pi",
+			State s1("s1");
+			HiddenMarkovModel hmm;
+			hmm.add_state(s1);
+			/* Set initial probability by adding a transition to the being state of the hmm. */
+			hmm.add_transition(hmm.begin(), s1, 0.4);
+			ASSERT(hmm.has_state(s1));
+			ASSERT(hmm.has_transition(hmm.begin(), s1));
+			/* Or by directly calling begin_transition. */
+			State s2("s2");
+			hmm.add_state(s2);
+			hmm.begin_transition(s2, 0.5);
+			ASSERT(hmm.has_transition(hmm.begin(), s2));
+		)
 
 		/* Backward */
 
 		/* Forward */
 
-		/* Log Probability */
-
-		/* Decode Viterbi */
+		/* Likelihood */
 
 		/* Sample */
 
-		/* Train Viterbi */
+		/* Decode Viterbi */
 
 		/* Train B-W */
+
+		/* Train Viterbi */
 
 		/* Train stochastic EM */
 

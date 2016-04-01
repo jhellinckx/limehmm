@@ -168,7 +168,14 @@ public:
 		catch(const IncidentVertexNotFoundException<State>& e){
 			throw StateNotFoundException(e.trigger(), error_message::kAddTransitionStateNotFound);
 		}
-		
+	}
+
+	void begin_transition(const State& state, double probability) {
+		add_transition(begin(), state, probability);
+	}
+
+	void end_transition(const State& state, double probability) {
+		add_transition(end(), state, probability);
 	}
 
 	/* See behavior of Graph::remove_edge() */
