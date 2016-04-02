@@ -361,7 +361,7 @@ public:
 
 	}
 
-	~HiddenMarkovModel(){
+	virtual ~HiddenMarkovModel(){
 		_clear_raw_data();
 	}
 };

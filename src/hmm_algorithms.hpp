@@ -6,7 +6,25 @@
 #include "state.hpp"
 #include "symbol.hpp"
 
-class DecodingAlgorithm{
+class HMMAlgorithm{};
+
+class ForwardAlgorithm : public HMMAlgorithm {
+
+	template<typename Symbol>
+	std::vector<double> forward(const std::vector<Symbol>& symbols){
+
+	} 
+
+};
+
+class BackwardAlgorithm : public HMMAlgorithm {
+	template<typename Symbol>
+	std::vector<double> backward(const std::vector<Symbol>& symbols){
+		
+	} 
+};
+
+class DecodingAlgorithm : public HMMAlgorithm {
 public:
 	virtual std::vector<std::string> decode(const std::vector<Symbol>&, Model&) = 0;
 };
@@ -18,7 +36,7 @@ class LinearViterbiDecoding : public DecodingAlgorithm{
 
 };
 
-class TrainingAlgorithm{
+class TrainingAlgorithm : public HMMAlgorithm {
 public:
 	virtual void trainModel(const std::vector<Symbol>&, Model&) = 0;
 };
