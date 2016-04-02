@@ -2,9 +2,7 @@
 #define __HMMALGORITHMS_HPP
 
 #include <vector>
-#include "model.hpp"
-#include "state.hpp"
-#include "symbol.hpp"
+#include "distributions.hpp"
 
 class HMMAlgorithm{};
 
@@ -38,24 +36,24 @@ class LinearViterbiDecoding : public DecodingAlgorithm{
 
 class TrainingAlgorithm : public HMMAlgorithm {
 public:
-	virtual void trainModel(const std::vector<Symbol>&, Model&) = 0;
+	virtual void train(const std::vector<Symbol>&, Model&) = 0;
 };
 
 class LinearViterbiTraining : public TrainingAlgorithm{
-	virtual void trainModel(const std::vector<Symbol>& training_set, Model& trained_model){
+	virtual void train(const std::vector<Symbol>& training_set, Model& trained_model){
 
 	}
 
 };
 
 class LinearBaumWelchTraining : public TrainingAlgorithm{
-	virtual void trainModel(const std::vector<Symbol>& training_set, Model& trained_model){
+	virtual void train(const std::vector<Symbol>& training_set, Model& trained_model){
 
 	}
 };
 	
 class LinearEMTraining : public TrainingAlgorithm{
-	virtual void trainModel(const std::vector<Symbol>& training_set, Model& trained_model){
+	virtual void train(const std::vector<Symbol>& training_set, Model& trained_model){
 
 	}
 };

@@ -97,7 +97,7 @@ public:
 
 /* <----------------------------> */
 
-class HiddenMarkovModel{
+class HiddenMarkovModel {
 private:
 	/* Name of this hmm. */
 	std::string _name;
@@ -117,6 +117,7 @@ private:
 	std::vector<Distribution*> _B;
 	std::vector<double> _pi_begin;
 	std::vector<double> _pi_end;
+	bool _is_finite;
 
 	void _clear_raw_data() {
 		for(Distribution* dist : _B){
@@ -126,6 +127,7 @@ private:
 		_pi_begin.clear();
 		_pi_end.clear();
 		_A.clear();
+		_is_finite = false;
 	}
 
 public:
@@ -255,6 +257,8 @@ public:
 		/* Begin/end states transitions. */
 		std::vector<double> pi_begin(states.size() - 2);
 		std::vector<double> pi_end(states.size() - 2);
+		/* Transitions to end state exist and > 0 */
+		bool finite = false;
 		/* Init one row per state and map state to matrix index. 
 		Default values set to negative infinity since we use log probabilites. */
 		std::size_t i = 0;
@@ -268,7 +272,7 @@ public:
 			}
 		}
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
-		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill, bool update_from) {
+		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill, bool update_from, bool normalize = true) {
 			std::function<std::size_t(const Edge<State>*)> state_index;
 			if(update_from) state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->from()->name()]; };
 			else state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
@@ -279,9 +283,10 @@ public:
 				prob_sum += prob;
 				prob_vec_to_fill[state_index(edge)] = log(prob);
 			}
-			if(prob_sum != 1.0){
+			if(prob_sum != 1.0 && normalize){
 				utils::for_each_log_normalize(prob_vec_to_fill.begin(), prob_vec_to_fill.end(), log(prob_sum));
 			}
+			return prob_sum;
 		};
 		for(std::size_t i = 0; i < states.size(); ++i){
 			State& state = *states[i];
@@ -289,19 +294,24 @@ public:
 			if(state == begin()){
 				if(_graph.get_in_edges(state).size() > 0) throw std::logic_error("begin state cannot have predecessors");
 				std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
-				fill_normalize(out_edges, pi_begin, false);
+				double prob_sum = fill_normalize(out_edges, pi_begin, false);
+				if(prob_sum == 0.0) throw std::logic_error("hmm has no begin transition");
 			}
 			
 			/* Fill end transitions. Throw exception if end state has successors. */
 			else if(state == end()){
 				if(_graph.get_out_edges(state).size() > 0) throw std::logic_error("end state cannot have successors");
 				std::vector<Edge<State>*> in_edges = _graph.get_in_edges(state);
-				fill_normalize(in_edges, pi_end, true);
+				/* Do not normalize. */
+				double prob_sum = fill_normalize(in_edges, pi_end, true, false);
+				/* Determine whether the hmm is finite by summing the end state in transitions probabilities. */
+				if(prob_sum > 0.0) finite = true;
 			}
 			/* Fill normal transitions aka matrix A. */
 			else{
 				std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
-				fill_normalize(out_edges, A[states_indices[state.name()]], false);
+				double prob_sum = fill_normalize(out_edges, A[states_indices[state.name()]], false);
+				if(prob_sum == 0.0) throw std::logic_error("hmm has no transition from " + state.to_string());;
 			}
 		}
 		/* Fill emission matrix with the states PDFs. */
@@ -316,12 +326,13 @@ public:
 			}
 		}
 
+		/* Set fields for the hmm raw values. */
 		_A = std::move(A);
 		_B = std::move(B);
 		_states_indices = std::move(states_indices);
-		_pi_begin = pi_begin;
-		_pi_end = pi_end;
-
+		_pi_begin = std::move(pi_begin);
+		_pi_end = std::move(pi_end);
+		_is_finite = finite;
 	}
 
 	Matrix<double>& raw_transitions() { return _A; }
@@ -330,23 +341,111 @@ public:
 	std::vector<double>& raw_pi_end() { return _pi_end; }
 	std::map<std::string, std::size_t>& states_indices() { return _states_indices; }
 
-	// template<typename Symbol> //TODO
-	// std::vector<double> forward(const std::vector<Symbol>& symbols) {
-	// 	std::pair<std::vector<double>, std::vector<double>> fwd = std::make_pair(std::vector<double>(_A.size()), std::vector<double>(_A.size()));
-	// 	fwd.first;
-	// }
+	template<typename Symbol>
+	std::vector<double> forward(const std::vector<Symbol>& symbols, std::size_t t_max) {
+		auto init_forward = [&symbols, this]() -> std::vector<double> {
+			std::vector<double> init_fwd(_pi_begin.size());
+			for(std::size_t i = 0; i < init_fwd.size(); ++i){
+				init_fwd[i] = _pi_begin[i] + (*_B[i])[symbols[0]];
+			}
+			return init_fwd;
+		};
+		auto iter_forward = [&symbols, this](const std::vector<double>& previous_fwd, std::size_t t) -> std::vector<double> {
+			std::vector<double> current_fwd(_A.size());
+			for(std::size_t j = 0; j < current_fwd.size(); ++j){
+				double prob_sum = utils::kNegInf;
+				for(std::size_t i = 0; i < current_fwd.size(); ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, previous_fwd[i] + _A[i][j]);	
+				}
+				current_fwd[j] = prob_sum + (*_B[j])[symbols[t]];
+			}
+		};
+		
+		if(symbols.size() == 0) throw std::runtime_error("forward on empty symbol list");
+		else{
+			std::vector<double> fwd = init_forward();
+			for(std::size_t t = 1; t < min(symbols.size(), t_max); ++t){
+				fwd = iter_forward(fwd, t);
+			}
+			return fwd;
+		}
+	}
 
-	// template<typename Symbol>
-	// std::vector<double> backward(const std::vector<Symbol>& symbols) {
+	template<typename Symbol>
+	std::vector<double> backward(const std::vector<Symbol>& symbols, std::size_t t_min) {
+		auto init_backward = [&symbols, this]() -> std::vector<double> {
+			std::vector<double> init_bwd(_pi_end.size());
+			if(_is_finite){
+				for(std::size_t i = 0; i < init_bwd.size(); ++i){
+					init_bwd[i] = _pi_end[i];
+				}
+			}
+			else{
+				for(std::size_t i = 0; i < init_bwd.size(); ++i){
+					init_bwd[i] = 0.0; // log(1) = 0.0 ! 
+				}
+			}
+			return init_bwd;
+		};
+		auto iter_backward = [&symbols, this](const std::vector<double>& next_bwd, std::size_t t) -> std::vector<double> {
+			std::vector<double> current_bwd(_A.size());
+			for(std::size_t i = 0; i < current_bwd.size(); ++i){
+				double prob_sum = utils::kNegInf;
+				for(std::size_t j = 0; j < current_bwd.size(); ++j){
+					prob_sum = utils::sum_log_prob(prob_sum, _A[i][j] + (*_B[j])[symbols[t]] + next_bwd[j]) ;	
+				}
+				current_bwd[i] = prob_sum;
+			}
+		};
+		if(symbols.size() == 0) throw std::runtime_error("backward on empty symbol list");
+		else{
+			std::vector<double> bwd = init_backward();
+			for(std::size_t t = symbols.size() - 1; t > t_min; ++t){
+				bwd = iter_backward(bwd, t);
+			}
+			return bwd;
+		}
+	}
 
-	// }
+	template<typename Symbol>
+	double log_likelihood(const std::vector<Symbol>& symbols){
+		auto terminate_forward = [this](std::vector<double>& previous_fwd) -> std::vector<double>{
+			if(_is_finite){
+				for(std::size_t i = 0; i < previous_fwd.size(); ++i){
+					previous_fwd[i] = previous_fwd[i] + _pi_end[i];
+				}
+				return previous_fwd;
+			}
+		};
+
+		// auto terminate_backward = [&symbols, this](const std::vector<double>& next_bwd) -> std::vector<double> {
+		// 	for(std::size_t i = 0; i < next_bwd.size(); ++i){
+		// 		double prob_sum = utils::kNegInf;
+		// 		for(std::size_t j = 0; j < next_bwd.size(); ++j){
+		// 			prob_sum = utils::sum_log_prob(prob_sum, _A[i][j] + (*_B[j])[symbols[t]] + next_bwd[j]) ;	
+		// 		}
+		// 		current_bwd[i] = prob_sum;
+		// 	}
+		// };
+	}
+
+	template<typename Symbol>
+	double likelihood(const std::vector<Symbol>& symbols){
+		return exp(log_likelihood(symbols));
+	}
 
 	void sample() {
 
 	}
 
-	void decode() {
+	template<typename Symbol>
+	std::vector<State> viterbi(const std::vector<Symbol>& symbols) {
+		return std::vector<State>(symbols.size());
+	}
 
+	template<typename Symbol>
+	std::vector<State> decode(std::vector<Symbol>& symbols) {
+		return viterbi(symbols);
 	}
 
 	void train() {

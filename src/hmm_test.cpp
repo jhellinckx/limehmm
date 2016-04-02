@@ -25,11 +25,13 @@
 #define RED "\033[31m"
 #define GREEN "\033[32m"
 #define MAGENTA "\033[35m"
-#define RESET "\033[0m"
+#define CYAN "\033[36m"
 #define BOLDRED "\033[1;31m"
 #define BOLDGREEN "\033[1;32m"
-#define BOLDCYAN "\033[1;36m"
 #define BOLDMAGENTA "\033[1;35m"
+#define BOLDCYAN "\033[1;36m"
+#define RESET "\033[0m"
+
 
 void print_exception(const std::exception& e){ std::cerr << RED << e.what() << RESET << std::endl; }
 
@@ -250,6 +252,13 @@ int main(){
 			hmm.add_state(State("s2", dist1));
 			double s2_t = 0.5;
 			hmm.add_transition("s1", "s2", s2_t);
+			/* No begin transition throws exception. */
+			ASSERT_EXCEPT(hmm.brew(), std::logic_error);
+			hmm.add_transition(hmm.begin(), "s1", 1);
+			/* Each state needs to have at least one out transition with prob > 0. */
+			ASSERT_EXCEPT(hmm.brew(), std::logic_error);
+			hmm.add_transition("s2","s1",1);
+			/* Now OK ! */
 			hmm.brew();
 			std::size_t s1_index = hmm.states_indices()["s1"];
 			std::size_t s2_index =  hmm.states_indices()["s2"];
@@ -261,6 +270,9 @@ int main(){
 			double s4_t = 0.3;
 			hmm.add_transition("s1","s3", s3_t);
 			hmm.add_transition("s1","s4", s4_t);
+			/* Set sum of out transitions > 0 for each state. */
+			hmm.add_transition("s3","s1", s3_t);
+			hmm.add_transition("s4","s1", s4_t);
 			hmm.brew();
 			ASSERT(hmm.raw_transitions().size() == 4);
 			ASSERT(hmm.raw_pi_begin().size() == 4);
@@ -282,8 +294,11 @@ int main(){
 			hmm.add_state(State("s6", dist1));
 			double s5_t = 0.2; 
 			double s6_t = 0.6;
+			hmm.remove_transition("s2","s1");
 			hmm.add_transition("s2","s5",s5_t);
 			hmm.add_transition("s2","s6",s6_t);
+			hmm.add_transition("s5","s2",s5_t);
+			hmm.add_transition("s6","s2",s6_t);
 			hmm.brew();
 			std::size_t s2_n = hmm.states_indices()["s2"];
 			std::size_t s5_n = hmm.states_indices()["s5"];
@@ -295,9 +310,9 @@ int main(){
 			ASSERT(utils::round_double(exp(t_6)) == 0.75);
 		)
 
-		/* Backward */
-
 		/* Forward */
+		
+		/* Backward */
 
 		/* Likelihood */
 
