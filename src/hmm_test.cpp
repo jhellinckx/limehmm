@@ -8,7 +8,8 @@
 #include <vector>
 #include <string>
 #include <stdlib.h>
-
+#include <math.h>
+#include "utils.hpp"
 #include "hmm.hpp" // tested hmm library
 
 #define ASSERT(expr) assert(expr, #expr, __FILE__, __LINE__)
@@ -19,8 +20,8 @@
 #define TEST_UNIT(name, instructions) run_unit_test(name, [](){instructions});
 
 #define VERBOSE 1
-#define BIG_SEPARATOR "======================================================"
-#define THIN_SEPARATOR "------------------------------------------------------"
+#define BIG_SEPARATOR std::string(60, '=')
+#define THIN_SEPARATOR std::string(60, '-')
 #define RED "\033[31m"
 #define GREEN "\033[32m"
 #define MAGENTA "\033[35m"
@@ -245,9 +246,53 @@ int main(){
 			HiddenMarkovModel hmm;
 			DiscreteDistribution dist1 = DiscreteDistribution({{"A",0.3}, {"T", 0.2}, {"G", 0.5}});
 			hmm.add_state(State("s1", dist1));
-			dist1["C"] = 0.3;
+			dist1["C"] = 0.2;
 			hmm.add_state(State("s2", dist1));
+			double s2_t = 0.5;
+			hmm.add_transition("s1", "s2", s2_t);
 			hmm.brew();
+			std::size_t s1_index = hmm.states_indices()["s1"];
+			std::size_t s2_index =  hmm.states_indices()["s2"];
+			double brewed_transition = hmm.raw_transitions()[s1_index][s2_index];
+			ASSERT(brewed_transition == log(1.0));
+			hmm.add_state(State("s3", dist1));
+			hmm.add_state(State("s4", dist1));
+			double s3_t = 0.2;
+			double s4_t = 0.3;
+			hmm.add_transition("s1","s3", s3_t);
+			hmm.add_transition("s1","s4", s4_t);
+			hmm.brew();
+			ASSERT(hmm.raw_transitions().size() == 4);
+			ASSERT(hmm.raw_pi_begin().size() == 4);
+			ASSERT(hmm.raw_pi_end().size() == 4);
+			ASSERT(hmm.raw_pdfs().size() == 4);
+			std::size_t s1_i = hmm.states_indices()["s1"];
+			std::size_t s2_i =  hmm.states_indices()["s2"];
+			std::size_t s3_i =  hmm.states_indices()["s3"];
+			std::size_t s4_i =  hmm.states_indices()["s4"];
+			double t_2 = hmm.raw_transitions()[s1_i][s2_i];
+			double t_3 = hmm.raw_transitions()[s1_i][s3_i];
+			double t_4 = hmm.raw_transitions()[s1_i][s4_i];
+			/* Sum to 1, no normalization was needed, same probabilities. */
+			ASSERT(t_2 == log(s2_t));
+			ASSERT(t_3 == log(s3_t));
+			ASSERT(t_4 == log(s4_t));
+			ASSERT(utils::round_double(exp((*(hmm.raw_pdfs()[s2_index]))["A"])) == 0.25);
+			hmm.add_state(State("s5", dist1));
+			hmm.add_state(State("s6", dist1));
+			double s5_t = 0.2; 
+			double s6_t = 0.6;
+			hmm.add_transition("s2","s5",s5_t);
+			hmm.add_transition("s2","s6",s6_t);
+			hmm.brew();
+			std::size_t s2_n = hmm.states_indices()["s2"];
+			std::size_t s5_n = hmm.states_indices()["s5"];
+			std::size_t s6_n = hmm.states_indices()["s6"];
+			double t_5 = hmm.raw_transitions()[s2_n][s5_n];
+			double t_6 = hmm.raw_transitions()[s2_n][s6_n];
+			/* sum is 0.2 + 0.6 thus with normalization 0.2 becomes 0.25, 0.6 become 0.75. */
+			ASSERT(utils::round_double(exp(t_5)) == 0.25);
+			ASSERT(utils::round_double(exp(t_6)) == 0.75);
 		)
 
 		/* Backward */

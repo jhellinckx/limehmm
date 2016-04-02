@@ -100,7 +100,7 @@ public:
 							return previous + entry.second;
 						};
 		}
-		return std::accumulate(_distribution.begin(), _distribution.end(), double(0), prob_adder);
+		return std::accumulate(_distribution.begin(), _distribution.end(), init_sum, prob_adder);
 	}
 
 	std::string to_string() const {
@@ -140,7 +140,7 @@ public:
 		if(exp(probabilities_sum) != 1.0){
 			std::for_each(_distribution.begin(), _distribution.end(),
 				[&probabilities_sum](std::pair<const std::string, double>& entry) {
-					entry.second = entry.second - probabilities_sum;
+					entry.second = utils::log_normalize(entry.second, probabilities_sum);
 				});
 		}
 	}
