@@ -377,6 +377,7 @@ class Graph{
 	/* Removes all the vertices. Deletes the dynamically allocated vertices before
 	calling the standard clear on the vector. */
 	void _clear_all_vertices() {
+		_clear_all_edges();
 		std::for_each(_vertices.begin(), _vertices.end(), 
 						[](const VertexElementBase* vertex){
 							delete vertex;
