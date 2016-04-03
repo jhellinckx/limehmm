@@ -222,6 +222,12 @@ int main(){
 			/* Re-add it. */
 			hmm.add_transition(s1, s2, 0.3);
 			ASSERT(hmm.has_transition(s1, s2));
+			/* Add transition where from == to. */
+			hmm.add_transition(s1, s1, 0.9);
+			ASSERT(hmm.has_transition(s1, s1));
+			/* Remove it. */
+			hmm.remove_transition(s1, s1);
+			ASSERT(!hmm.has_transition(s1, s1));
 			/* Removing a state removes its transitions from and to other states. */
 			hmm.remove_state(s1);
 			ASSERT(!hmm.has_transition(s1, s2));
@@ -310,19 +316,159 @@ int main(){
 			ASSERT(utils::round_double(exp(t_6)) == 0.75);
 		)
 
-		/* Forward */
-		
-		/* Backward */
+		TEST_UNIT(
+			"forward",
+			/* Create a simple fair-biased model. */
+			HiddenMarkovModel hmm;
+			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
+			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
+			State fair = State("fair", fair_dist);
+			State biased = State("biased", biased_dist);
+			hmm.add_state(fair);
+			hmm.add_transition(hmm.begin(), fair, 0.5);
+			hmm.add_state(biased);
+			hmm.add_transition(hmm.begin(), biased, 0.5);
+			hmm.add_transition(fair, fair, 0.9);
+			hmm.add_transition(fair, biased, 0.1);
+			hmm.add_transition(biased, biased, 0.9);
+			hmm.add_transition(biased, fair, 0.1);
+			hmm.brew();
+			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			/* Test init forward aka t = 1 aka first forward column. */
+			double precomputed_init_fwd_fair = 0.25;
+			double precomputed_init_fwd_biased = 0.125;
+			/* Second parameter gives t. */
+			std::vector<double> init_fwd = hmm.forward(symbols, 1);
+			ASSERT(init_fwd.size() == 2);
+			double init_fwd_fair = utils::round_double(exp(init_fwd[hmm.states_indices()["fair"]]), 2);
+			double init_fwd_biased = utils::round_double(exp(init_fwd[hmm.states_indices()["biased"]]), 3);
+			ASSERT(init_fwd_fair == precomputed_init_fwd_fair);
+			ASSERT(init_fwd_biased == precomputed_init_fwd_biased);
+			/* Test middle column. */
+			double precomputed_mid_fwd_fair = 0.0303;
+			double precomputed_mid_fwd_biased = 0.0191;
+			std::vector<double> mid_fwd = hmm.forward(symbols, 4);
+			double mid_fwd_fair = utils::round_double(exp(mid_fwd[hmm.states_indices()["fair"]]), 4);
+			double mid_fwd_biased = utils::round_double(exp(mid_fwd[hmm.states_indices()["biased"]]), 4);
+			ASSERT(mid_fwd_fair == precomputed_mid_fwd_fair);
+			ASSERT(mid_fwd_biased == precomputed_mid_fwd_biased);
+			/* Test last fwd column. */
+			double precomputed_end_fwd_fair = 0.0015;
+			double precomputed_end_fwd_biased = 0.0013;
+			/* T not given, iterate on all the symbols. */
+			std::vector<double> fwd_end = hmm.forward(symbols);
+			double end_fwd_fair = utils::round_double(exp(fwd_end[hmm.states_indices()["fair"]]), 4);
+			double end_fwd_biased = utils::round_double(exp(fwd_end[hmm.states_indices()["biased"]]), 4);
+			ASSERT(end_fwd_fair == precomputed_end_fwd_fair);
+			ASSERT(end_fwd_biased == precomputed_end_fwd_biased);
+		)
 
-		/* Likelihood */
+		TEST_UNIT(
+			"backward",
+			/* Same model as forward test. */
+			HiddenMarkovModel hmm;
+			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
+			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
+			State fair = State("fair", fair_dist);
+			State biased = State("biased", biased_dist);
+			hmm.add_state(fair);
+			hmm.add_transition(hmm.begin(), fair, 0.5);
+			hmm.add_state(biased);
+			hmm.add_transition(hmm.begin(), biased, 0.5);
+			hmm.add_transition(fair, fair, 0.9);
+			hmm.add_transition(fair, biased, 0.1);
+			hmm.add_transition(biased, biased, 0.9);
+			hmm.add_transition(biased, fair, 0.1);
+			hmm.brew();
+			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			/* Test init backward. */
+			double precomputed_init_bwd_fair = 1;
+			double precomputed_init_bwd_biased = 1;
+			std::vector<double> init_bwd = hmm.backward(symbols, symbols.size());
+			ASSERT(init_bwd.size() == 2);
+			double init_bwd_fair = utils::round_double(exp(init_bwd[hmm.states_indices()["fair"]]), 3);
+			double init_bwd_biased = utils::round_double(exp(init_bwd[hmm.states_indices()["biased"]]), 3);
+			ASSERT(init_bwd_fair == precomputed_init_bwd_fair);
+			ASSERT(init_bwd_biased == precomputed_init_bwd_biased);
+			/* Test middle column. */
+			double precomputed_mid_bwd_fair = 0.0679;
+			double precomputed_mid_bwd_biased = 0.0366;
+			std::vector<double> mid_bwd = hmm.backward(symbols, 4);
+			double mid_bwd_fair = utils::round_double(exp(mid_bwd[hmm.states_indices()["fair"]]), 4);
+			double mid_bwd_biased = utils::round_double(exp(mid_bwd[hmm.states_indices()["biased"]]), 4);
+			ASSERT(mid_bwd_fair == precomputed_mid_bwd_fair);
+			ASSERT(mid_bwd_biased == precomputed_mid_bwd_biased);
+			/* Test last backward column. */
+			double precomputed_end_bwd_fair = 0.0075;
+			double precomputed_end_bwd_biased = 0.0071;
+			std::vector<double> bwd_end = hmm.backward(symbols);
+			double end_bwd_fair = utils::round_double(exp(bwd_end[hmm.states_indices()["fair"]]), 4);
+			double end_bwd_biased = utils::round_double(exp(bwd_end[hmm.states_indices()["biased"]]), 4);
+			ASSERT(end_bwd_fair == precomputed_end_bwd_fair);
+			ASSERT(end_bwd_biased == precomputed_end_bwd_biased);
+		)
 
-		/* Sample */
+		TEST_UNIT(
+			"likelihood",
+			/* Same model as fwd/bwd. */
+			HiddenMarkovModel hmm;
+			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
+			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
+			State fair = State("fair", fair_dist);
+			State biased = State("biased", biased_dist);
+			hmm.add_state(fair);
+			hmm.add_transition(hmm.begin(), fair, 0.5);
+			hmm.add_state(biased);
+			hmm.add_transition(hmm.begin(), biased, 0.5);
+			hmm.add_transition(fair, fair, 0.9);
+			hmm.add_transition(fair, biased, 0.1);
+			hmm.add_transition(biased, biased, 0.9);
+			hmm.add_transition(biased, fair, 0.1);
+			hmm.brew();
+			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			double precomputed_likelihood = 0.0028;
+			/* Test likelihood with forward algorithm. */
+			double forward_likelihood = utils::round_double(hmm.likelihood(symbols), 4);
+			ASSERT(forward_likelihood == precomputed_likelihood);
+			/* Test likelihood with backward algorithm. */
+			double backward_likelihood = utils::round_double(hmm.likelihood(symbols, false), 4);
+			ASSERT(backward_likelihood == precomputed_likelihood);
+		)
 
-		/* Decode Viterbi */
+		TEST_UNIT(
+			"viterbi decode",
+			HiddenMarkovModel hmm;
+			DiscreteDistribution dist({{"H", 0.5}, {"T", 0.5}});
+			State s1 = State("s1", dist);
+			hmm.add_state(s1);
+			dist["H"] = 0.4;
+			dist["T"] = 0.6;
+			State s2 = State("s2", dist);
+			hmm.add_state(s2);
+			dist["H"] = 0.7;
+			dist["T"] = 0.3;
+			State s3 = State("s3", dist);
+			hmm.add_state(s3);
+			hmm.add_transition(s1, s1, 0.4);
+			hmm.add_transition(s1, s2, 0.3);
+			hmm.add_transition(s1, s3, 0.3);
+			hmm.add_transition(s2, s2, 0.4);
+			hmm.add_transition(s2, s1, 0.3);
+			hmm.add_transition(s2, s3, 0.3);
+			hmm.add_transition(s3, s3, 0.4);
+			hmm.add_transition(s3, s2, 0.3);
+			hmm.add_transition(s3, s1, 0.3);
+			std::vector<std::string> symbols({"T", "H", "H", "H", "T", "T", "H", "H"});
+			std::vector<std::string> precomputed_viterbi_path({"s2", "s2", "s3", "s3", "s3", "s2", "s2", "s2"});
+			ASSERT(hmm.viterbi(symbols) == precomputed_viterbi_path);
+		)
+
+	
+		/* Train Viterbi */
 
 		/* Train B-W */
 
-		/* Train Viterbi */
+		/* Sample */
 
 		/* Train stochastic EM */
 

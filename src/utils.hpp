@@ -14,8 +14,8 @@ namespace utils {
 	extern const double kNegInf = -std::numeric_limits<double>::infinity();
 	extern const int kPrecision = 8;
 
-	double round_double(const double& d){
-		return round(d * pow(10, kPrecision)) / pow(10, kPrecision);
+	double round_double(const double& d, int precision = kPrecision){
+		return round(d * pow(10, precision)) / pow(10, precision);
 	}
 
 	extern double sum_log_prob(double log_x, double log_y){

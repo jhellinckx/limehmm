@@ -74,7 +74,9 @@ public:
 		if(this != &other){
 			_name = other._name;
 			if(_distribution != nullptr){
+				
 				delete _distribution;
+				
 			}
 			_distribution = other._distribution;
 			other._distribution = nullptr;

@@ -166,6 +166,7 @@ public:
 	}
 
 	virtual double& operator[] (const double& symbol) {
+		std::cout<<"call double"<<std::endl;
 		return operator[](std::to_string(symbol));
 	}
 
