@@ -418,7 +418,7 @@ public:
 			/* Begin state has probability of 1 (log is 0), others 0 (log is negative infinity). */
 			init_fwd[0] = 0.0;
 			for(std::size_t i = 1; i < _A.size(); ++i) { 
-				log_prob = utils::kNegInf;
+				init_fwd[i] = utils::kNegInf;
 			}
 			return init_fwd;
 		};
