@@ -284,14 +284,11 @@ public:
 		std::vector<State*> silent_states;	
 		/* Keep track of the matrix index of each state. */
 		std::map<std::string, std::size_t> states_indices;
-		std::vector<std::string> states_names(states.size() - 2);
-		/* Raw transition matrix. Init its size. Decrement by 2 since
-		begin and end states transitions are stored in separated arrays. */
-		Matrix<double> A(states.size() - 2);
-		/* Begin/end states transitions. */
-		std::vector<double> pi_begin(states.size() - 2);
-		std::vector<double> pi_end(states.size() - 2);
-		/* Transitions to end state exist and > 0 */
+		std::vector<std::string> states_names(states.size());
+		/* Raw transition matrix. Init its size. 
+		Begin and state transitions are stored in first row and first column, respectively. */
+		Matrix<double> A(states.size());
+		/* Transitions to end state exist and is not empty. */
 		bool finite = false;
 		/* Init one row per state and map state to matrix index. 
 		Default values set to negative infinity since we use log probabilites. */
@@ -414,20 +411,39 @@ public:
 		if(t_max == 0) t_max = symbols.size();
 		auto init_forward = [&symbols, this]() -> std::vector<double> {
 			std::vector<double> init_fwd(_pi_begin.size());
-			for(std::size_t i = 0; i < _pi_begin.size(); ++i){
-				// Check if state is silent.
-				init_fwd[i] = (_B[i] != nullptr) ? _pi_begin[i] + (*_B[i])[symbols[0]] : _pi_begin[i];
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				init_fwd[i] = _pi_begin[i] + (*_B[i])[symbols[0]];
+			}
+			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+				init_fwd[i] = _pi_begin[i];
 			}
 			return init_fwd;
 		};
 		auto iter_forward = [&symbols, this](const std::vector<double>& previous_fwd, std::size_t t) -> std::vector<double> {
 			std::vector<double> current_fwd(_A.size());
-			for(std::size_t j = 0; j < _A.size(); ++j){
+			/* Do first normal states. */
+			for(std::size_t j = 0; j < _silent_states_index; ++j){
 				double prob_sum = utils::kNegInf;
 				for(std::size_t i = 0; i < _A.size(); ++i){
 					prob_sum = utils::sum_log_prob(prob_sum, previous_fwd[i] + _A[i][j]);	
 				}
-				current_fwd[j] = (_B[j] != nullptr) ? prob_sum + (*_B[j])[symbols[t]] : prob_sum;
+				current_fwd[j] = prob_sum + (*_B[j])[symbols[t]];
+			}
+			/* Do first iteration over silent states with i == normal state. */
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				double prob_sum = utils::kNegInf;
+				for(std::size_t i = 0; i < _silent_states_index; ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_fwd[i] + _A[i][j]);
+				}
+				current_fwd[j] = prob_sum;
+			}
+			/* Do second iteration over silent states with i == silent state < j. */
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				double prob_sum = current_fwd[j];
+				for(std::size_t i = _silent_states_index; i < j; ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_fwd[i] + _A[i][j]);
+				}
+				current_fwd[j] = prob_sum;
 			}
 			return current_fwd;
 		};
