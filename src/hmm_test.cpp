@@ -319,10 +319,9 @@ int main(){
 			hmm.add_transition("s3","s1", s3_t);
 			hmm.add_transition("s4","s1", s4_t);
 			hmm.brew();
-			ASSERT(hmm.raw_transitions().size() == 4);
-			ASSERT(hmm.raw_pi_begin().size() == 4);
-			ASSERT(hmm.raw_pi_end().size() == 4);
-			ASSERT(hmm.raw_pdfs().size() == 4);
+			/* Size is num_states + 1, first row/column is reserved for begin/end transitions. */
+			ASSERT(hmm.raw_transitions().size() == 5);
+			ASSERT(hmm.raw_pdfs().size() == 5);
 			std::size_t s1_i = hmm.states_indices()["s1"];
 			std::size_t s2_i =  hmm.states_indices()["s2"];
 			std::size_t s3_i =  hmm.states_indices()["s3"];
