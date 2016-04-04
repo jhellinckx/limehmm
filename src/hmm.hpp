@@ -309,22 +309,22 @@ public:
 		states_indices[end().name()] = 0;
 		/* Default values set to negative infinity since we use log probabilites. */
 		A[0] = std::vector<double>(num_states - 1, utils::kNegInf);
-		std::size_t i = 1;
+		std::size_t normal_states_index = 1;
 		for(State* p_state : states){
 			if(p_state->is_silent()) {
 				silent_states.push_back(p_state);
 			}
 			else{
-				A[i] = std::vector<double>(num_states - 1, utils::kNegInf);
+				A[normal_states_index] = std::vector<double>(num_states - 1, utils::kNegInf);
 				/* Map state name to row index. */
-				states_indices[p_state->name()] = i;
-				states_names[i] = p_state->name();
-				++i;
+				states_indices[p_state->name()] = normal_states_index;
+				states_names[normal_states_index] = p_state->name();
+				++normal_states_index;
 			}
 		}
 		std::size_t num_silent_states = silent_states.size();
 		/* This points to the beginning of the silent states array in A and B. */
-		std::size_t silent_states_index = i;
+		std::size_t silent_states_index = normal_states_index;
 		/* We use a topological sort on the silent states sub graph in order to adapt 
 		the HMM to silent states. */
 		/* See p. 71 at http://www.upch.edu.pe/facien/fc/dbmbqf/zimic/ubioinfo/bks/Bioinformatics/Biological%20Sequence%20Analysis%20Hmm%20Bioinformatics%20(Durbin).pdf */
@@ -336,12 +336,11 @@ public:
 		/* Get toposorted silent states. */
 		silent_states = subgraph.get_vertices();
 		/* Init the toposorted silent states rows in the matrix. */
-		std::size_t i = 0;
 		for(State* p_silent_state : silent_states){
-			A[silent_states_index + i] = std::vector<double>(num_states - 1, utils::kNegInf);
-			states_indices[p_silent_state->name()] = silent_states_index + i;
-			states_names[silent_states_index + i] = p_silent_state->name();
-			++i;
+			A[silent_states_index] = std::vector<double>(num_states - 1, utils::kNegInf);
+			states_indices[p_silent_state->name()] = silent_states_index;
+			states_names[silent_states_index] = p_silent_state->name();
+			++silent_states_index;
 		}
 
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
@@ -354,7 +353,7 @@ public:
 				prob_sum += prob;
 				prob_vec_to_fill[state_index(edge)] = log(prob);
 			}
-			if(prob_sum != 1.0 && normalize){
+			if(prob_sum != 1.0){
 				utils::for_each_log_normalize(prob_vec_to_fill.begin(), prob_vec_to_fill.end(), log(prob_sum));
 			}
 			return prob_sum;
@@ -382,21 +381,18 @@ public:
 
 		/* Determine whether the hmm is finite by summing the end state in transitions probabilities. */
 		double prob_sum_to_end = utils::kNegInf;
-		for(std::size_t i = 0; i < num_states(); ++i) { prob_sum_to_end += exp(A[i][0]); }
-		if(prob_sum_to_end > 0.0) { finite = true; }
+		for(std::size_t i = 0; i < A.size(); ++i) { prob_sum_to_end += exp(A[i][0]); }
+		if(prob_sum_to_end > 0.0) { finite = true; }
 
 		/* Fill emission matrix with the states PDFs. */
 		std::vector<Distribution*> B(num_states);
-		for(const State* p_state : states){
-			const State& state = *p_state;
-			if(state != begin() && state != end()){
-				Distribution* distribution = nullptr;
-				if(! state.is_silent()) {
-					distribution = state.distribution().clone();
-					distribution->log_normalize();
-				}
-				B[states_indices[state.name()]] = distribution;
+		for(State* p_state : states){
+			Distribution* distribution = nullptr;
+			if(! state->is_silent()) {
+				distribution = state->distribution().clone();
+				distribution->log_normalize();
 			}
+			B[states_indices[state->name()]] = distribution;
 		}
 
 		/* Set fields for the hmm raw values. */
@@ -404,8 +400,6 @@ public:
 		_B = std::move(B);
 		_states_indices = std::move(states_indices);
 		_states_names = std::move(states_names);
-		_pi_begin = std::move(pi_begin);
-		_pi_end = std::move(pi_end);
 		_is_finite = finite;
 		_silent_states_index = silent_states_index;
 	}
