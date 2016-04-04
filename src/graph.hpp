@@ -407,7 +407,8 @@ class Graph{
 				if(num_preds == 0) Q.push(to_vertex);
 			}
 		}
-		_vertices = L;
+		if(_vertices.size() != L.size()) throw std::logic_error("fail toposort");
+		else _vertices = L;
 	}
 
 	/* Removes all the edges. Deletes the dynamically allocated edges before

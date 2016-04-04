@@ -556,7 +556,8 @@ int main(){
 			hmm.add_transition(d2, m3, 0.70);
 			hmm.add_transition(d3, i3, 0.30);
 			hmm.add_transition(d3, hmm.end(), 0.70);
-			// hmm.brew();
+			hmm.brew();
+			std::cout << print_matrix(hmm.raw_transitions(), hmm.states_indices()) << std::endl;
 			// std::vector<std::vector<std::string>> sequences(4);
 			// sequences[0] = std::vector<std::string>({{"A","C","T"}});
 			// sequences[1] = std::vector<std::string>({{"G","G","C"}});

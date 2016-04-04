@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <sstream>
 #include <algorithm>	
 #include <math.h>	// log, exp
 #include <utility>	// std::pair
@@ -20,7 +21,7 @@
 template<typename Elem>
 using Matrix = std::vector<std::vector<Elem>>;
 
-std::ostream& operator<<(std::ostream& out, const Matrix<double>& matrix){
+std::string print_matrix(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices){
 	std::size_t longest_string = 0;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
@@ -28,6 +29,17 @@ std::ostream& operator<<(std::ostream& out, const Matrix<double>& matrix){
 			if(double_string.length() > longest_string) longest_string = double_string.length();
 		}
 	}
+	std::vector<std::string> sorted_names(indices.size());
+	std::ostringstream out;
+	for(auto& pair : indices) {
+		sorted_names[pair.second] = pair.first;
+	}
+	for(std::string& name : sorted_names) {
+		out << std::string(longest_string - name.length(), ' ');
+		out << name;
+		out << ' ';
+	}
+	out << std::endl;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
 			std::string double_string = std::to_string(matrix[i][j]);
@@ -37,7 +49,7 @@ std::ostream& operator<<(std::ostream& out, const Matrix<double>& matrix){
 		}
 		out << std::endl;
 	}
-	return out;
+	return out.str();	
 }
 
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
@@ -124,6 +136,7 @@ private:
 	std::vector<std::string> _states_names;
 	std::size_t _begin_state_index;
 	std::size_t _end_state_index;
+	std::size_t _silent_states_index;
 	Matrix<double> _A;
 	std::vector<Distribution*> _B;
 	std::vector<double> _pi_begin;
@@ -140,6 +153,7 @@ private:
 		_pi_end.clear();
 		_A.clear();
 		_is_finite = false;
+		_silent_states_index = std::size_t();
 	}
 
 public:
@@ -260,7 +274,8 @@ public:
 		/* Get rid of previous data. */
 		_clear_raw_data();
 		/* Get the states from graph. */
-		std::vector<State*> states = _graph.get_vertices();		
+		std::vector<State*> states = _graph.get_vertices();
+		std::vector<State*> silent_states;	
 		/* Keep track of the matrix index of each state. */
 		std::map<std::string, std::size_t> states_indices;
 		std::vector<std::string> states_names(states.size() - 2);
@@ -277,18 +292,44 @@ public:
 		std::size_t i = 0;
 		for(State* p_state : states){
 			State& state = *p_state;
-			if(state != begin() && state != end()){
+			if(state == begin() || state == end()) {
+				if(! state.is_silent()) throw std::logic_error("begin/end state has to be silent");
+			}
+			else if(state.is_silent()){
+				silent_states.push_back(p_state);
+			}
+			else{
 				A[i] = std::vector<double>(states.size() - 2, utils::kNegInf);
 				states_indices[state.name()] = i;
 				states_names[i] = state.name();
 				++i;
 			}
 		}
+		/* Start silent states in A and B. */
+		std::size_t silent_states_index = i;
+		/* Toposort silent states sub graph, see p. 71 at
+		http://www.upch.edu.pe/facien/fc/dbmbqf/zimic/ubioinfo/bks/Bioinformatics/Biological%20Sequence%20Analysis%20Hmm%20Bioinformatics%20(Durbin).pdf */
+		std::vector<State> silent_states_values;
+		for(State* silent_state : silent_states) { silent_states_values.push_back(*silent_state); }
+		Graph<State> subgraph = _graph.sub_graph(silent_states_values);
+		subgraph.topological_sort();
+		std::vector<State*> silent_states_toposort = subgraph.get_vertices();
+		/* Init the toposorted silent states row in the matrix. */
+		for(std::size_t i = 0; i < silent_states_toposort.size(); ++i){
+			State& state = *silent_states_toposort[i];
+			A[silent_states_index + i] = std::vector<double>(states.size() - 2, utils::kNegInf);
+			states_indices[state.name()] = silent_states_index + i;
+			states_names[silent_states_index + i] = state.name();
+		}
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
 		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill, bool update_from, bool normalize = true) {
 			std::function<std::size_t(const Edge<State>*)> state_index;
-			if(update_from) state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->from()->name()]; };
-			else state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
+			if(update_from) {
+				state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->from()->name()]; };
+			}
+			else{
+				state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
+			}
 			double prob_sum = 0;
 			double prob;
 			for(Edge<State>* edge : edges){
@@ -301,6 +342,7 @@ public:
 			}
 			return prob_sum;
 		};
+		/* Iterate first through the silent states and add them to the matrix. */
 		for(std::size_t i = 0; i < states.size(); ++i){
 			State& state = *states[i];
 			/* Fill begin transitions. Throw exception if begin state has predecessors. */
@@ -320,11 +362,14 @@ public:
 				/* Determine whether the hmm is finite by summing the end state in transitions probabilities. */
 				if(prob_sum > 0.0) finite = true;
 			}
-			/* Fill normal transitions aka matrix A. */
 			else{
+				/* Fill normal transitions aka matrix A. */
 				std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
+				out_edges.erase(std::remove_if(out_edges.begin(), out_edges.end(), [this](const Edge<State>* edge){
+						return ((*(edge->to())) == end()) ? true : false;
+					}), out_edges.end());
 				double prob_sum = fill_normalize(out_edges, A[states_indices[state.name()]], false);
-				if(prob_sum == 0.0) throw std::logic_error("hmm has no transition from " + state.to_string());;
+				if(prob_sum == 0.0) throw std::logic_error("hmm has no transition from " + state.to_string());
 			}
 		}
 		/* Fill emission matrix with the states PDFs. */
@@ -349,6 +394,7 @@ public:
 		_pi_begin = std::move(pi_begin);
 		_pi_end = std::move(pi_end);
 		_is_finite = finite;
+		_silent_states_index = silent_states_index;
 	}
 
 	Matrix<double>& raw_transitions() { return _A; }
@@ -537,11 +583,9 @@ public:
 						max_i = i;
 					}
 				}
-				std::cout << j << "->" << max_i << " "; 
 				current_delta[j] = max_delta + (*_B[j])[symbols[t]];
 				psi.add_link(max_i, j);
 			}
-			std::cout << std::endl;
 			psi.next_column();
 			return current_delta;
 		};
@@ -558,10 +602,8 @@ public:
 		std::pair<std::vector<double>, Traceback> init_viter = init_viterbi();
 		std::vector<double> delta = init_viter.first;
 		Traceback psi = init_viter.second;
-		std::cout << delta << std::endl;
 		for(std::size_t t = 0; t < symbols.size(); ++t){
 			delta = iter_viterbi(delta, psi, t);
-			std::cout << delta << std::endl;
 		}
 		return terminate_viterbi(delta, psi);
 	}
