@@ -414,12 +414,11 @@ public:
 	std::vector<double> forward(const SymbolContainer& symbols, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = symbols.size();
 		auto init_forward = [&symbols, this]() -> std::vector<double> {
-			std::vector<double> init_fwd(_pi_begin.size());
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				init_fwd[i] = _pi_begin[i] + (*_B[i])[symbols[0]];
-			}
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				init_fwd[i] = _pi_begin[i];
+			std::vector<double> init_fwd(_A.size());
+			/* Begin state has probability of 1 (log is 0), others 0 (log is negative infinity). */
+			init_fwd[0] = 0.0;
+			for(std::size_t i = 1; i < _A.size(); ++i) { 
+				log_prob = utils::kNegInf;
 			}
 			return init_fwd;
 		};
@@ -455,7 +454,7 @@ public:
 		if(symbols.size() == 0) throw std::runtime_error("forward on empty symbol list");
 		else{
 			std::vector<double> fwd = init_forward();
-			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t){
+			for(std::size_t t = 0; t < std::min(symbols.size(), t_max); ++t){
 				fwd = iter_forward(fwd, t);
 			}
 			return fwd;
