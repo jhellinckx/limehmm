@@ -17,15 +17,17 @@
 #include "state.hpp"
 #include "graph.hpp"
 #include "utils.hpp"
+#define CYAN "\033[36m"
+#define RESET "\033[0m"
 
 template<typename Elem>
 using Matrix = std::vector<std::vector<Elem>>;
 
-std::string print_matrix(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices){
+std::string print_matrix(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
 	std::size_t longest_string = 0;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
-			std::string double_string = std::to_string(matrix[i][j]);
+			std::string double_string = (log_prob) ? std::to_string(matrix[i][j]) : std::to_string(exp(matrix[i][j]));
 			if(double_string.length() > longest_string) longest_string = double_string.length();
 		}
 	}
@@ -34,15 +36,19 @@ std::string print_matrix(const Matrix<double>& matrix, const std::map<std::strin
 	for(auto& pair : indices) {
 		sorted_names[pair.second] = pair.first;
 	}
+	out << std::string(longest_string + 1, ' ');
 	for(std::string& name : sorted_names) {
 		out << std::string(longest_string - name.length(), ' ');
-		out << name;
+		out << CYAN << name << RESET;
 		out << ' ';
 	}
 	out << std::endl;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
+		out << std::string(longest_string - sorted_names[i].length(), ' ');
+		out << CYAN << sorted_names[i] << RESET;
+		out << ' ';
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
-			std::string double_string = std::to_string(matrix[i][j]);
+			std::string double_string = (log_prob) ? std::to_string(matrix[i][j]) : std::to_string(exp(matrix[i][j]));
 			out << std::string(longest_string - double_string.length(), ' ');
 			out << double_string;
 			out << ' ';
