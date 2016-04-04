@@ -281,58 +281,58 @@ public:
 		_clear_raw_data();
 		/* Get the states from graph. */
 		std::vector<State*> states = _graph.get_vertices();
-		std::vector<State*> silent_states;	
+		std::size_t num_states = states.size();
+		/* Remove begin and end states. */
+		states.erase(std::remove(states.begin(), states.end(), [this](State* p_state){ return (*p_state) == begin() || (*p_state) == end(); }), states.end());
+		std::vector<State*> silent_states;
 		/* Keep track of the matrix index of each state. */
 		std::map<std::string, std::size_t> states_indices;
-		std::vector<std::string> states_names(states.size());
+		std::vector<std::string> states_names(num_states);
 		/* Raw transition matrix. Init its size. 
 		Begin and state transitions are stored in first row and first column, respectively. */
-		Matrix<double> A(states.size());
+		Matrix<double> A(num_states);
 		/* Transitions to end state exist and is not empty. */
 		bool finite = false;
+		if(!begin().is_silent()) { throw std::logic_error("begin state has to be silent."); }
+		if(!end().is_silent()) { throw std::logic_error("end state has to be silent."); }
 		/* Init one row per state and map state to matrix index. 
 		Default values set to negative infinity since we use log probabilites. */
-		std::size_t i = 0;
+		std::size_t i = 1;
 		for(State* p_state : states){
-			State& state = *p_state;
-			if(state == begin() || state == end()) {
-				if(! state.is_silent()) throw std::logic_error("begin/end state has to be silent");
-			}
-			else if(state.is_silent()){
+			if(p_state->is_silent()) {
 				silent_states.push_back(p_state);
 			}
 			else{
-				A[i] = std::vector<double>(states.size() - 2, utils::kNegInf);
-				states_indices[state.name()] = i;
-				states_names[i] = state.name();
+				A[i] = std::vector<double>(num_states, utils::kNegInf);
+				states_indices[p_state->name()] = i;
+				states_names[i] = p_state->name();
 				++i;
 			}
 		}
-		/* Start silent states in A and B. */
+		std::size_t num_silent_states = silent_states.size();
+		/* This points to the beginning of the silent states in A and B. */
 		std::size_t silent_states_index = i;
-		/* Toposort silent states sub graph, see p. 71 at
-		http://www.upch.edu.pe/facien/fc/dbmbqf/zimic/ubioinfo/bks/Bioinformatics/Biological%20Sequence%20Analysis%20Hmm%20Bioinformatics%20(Durbin).pdf */
-		std::vector<State> silent_states_values;
-		for(State* silent_state : silent_states) { silent_states_values.push_back(*silent_state); }
+		/* Use a topological sort on the silent states sub graph. Given that silent states cycles 
+		are not allowed, we can sort silent states in A and B this way.
+		See p. 71 at http://www.upch.edu.pe/facien/fc/dbmbqf/zimic/ubioinfo/bks/Bioinformatics/Biological%20Sequence%20Analysis%20Hmm%20Bioinformatics%20(Durbin).pdf */
+		/* Dereference silent states pointers to pass them to subgraph. */
+		std::vector<State> silent_states_values(num_silent_states);
+		std::transform(silent_states.begin(), silent_states.end(), silent_states_values.begin(), [](State* p){ return *p; });
 		Graph<State> subgraph = _graph.sub_graph(silent_states_values);
 		subgraph.topological_sort();
-		std::vector<State*> silent_states_toposort = subgraph.get_vertices();
-		/* Init the toposorted silent states row in the matrix. */
-		for(std::size_t i = 0; i < silent_states_toposort.size(); ++i){
-			State& state = *silent_states_toposort[i];
-			A[silent_states_index + i] = std::vector<double>(states.size() - 2, utils::kNegInf);
-			states_indices[state.name()] = silent_states_index + i;
-			states_names[silent_states_index + i] = state.name();
+		/* Get toposorted silent states. */
+		silent_states = subgraph.get_vertices();
+		/* Init the toposorted silent states rows in the matrix. */
+		std::size_t i = 0;
+		for(State* p_silent_state : silent_states){
+			A[silent_states_index + i] = std::vector<double>(num_states, utils::kNegInf);
+			states_indices[p_silent_state->name()] = silent_states_index + i;
+			states_names[silent_states_index + i] = p_silent_state->name();
+			++i;
 		}
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
-		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill, bool update_from, bool normalize = true) {
-			std::function<std::size_t(const Edge<State>*)> state_index;
-			if(update_from) {
-				state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->from()->name()]; };
-			}
-			else{
-				state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
-			}
+		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill) {
+			auto state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
 			double prob_sum = 0;
 			double prob;
 			for(Edge<State>* edge : edges){
@@ -345,38 +345,35 @@ public:
 			}
 			return prob_sum;
 		};
-		/* Iterate first through the silent states and add them to the matrix. */
-		for(std::size_t i = 0; i < states.size(); ++i){
+
+		/* Add the begin state transitions. */
+		State& begin_state = begin();
+		if(_graph.get_in_edges(begin_state).size() > 0) { throw std::logic_error("begin state cannot have predecessors"); }
+		std::vector<Edge<State>*> out_edges = _graph.get_out_edges(begin_state);
+		/* Begin transitions are added in the first row of A s.t. A[0][i] == pi[i]. */
+		double prob_sum = fill_normalize(out_edges, A[0]);
+		if(prob_sum == 0.0) { throw std::logic_error("hmm has no begin transition"); }
+		
+		/* Check if end state has out edges. */
+		State& end_state = end();
+		if(_graph.get_out_edges(end_state).size() > 0) { throw std::logic_error("end state cannot have successors"); }
+
+		/* Iterate through all the other states and add them to the matrix. */
+		for(std::size_t i = 0; i < num_states; ++i){
 			State& state = *states[i];
-			/* Fill begin transitions. Throw exception if begin state has predecessors. */
-			if(state == begin()){
-				if(_graph.get_in_edges(state).size() > 0) throw std::logic_error("begin state cannot have predecessors");
-				std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
-				double prob_sum = fill_normalize(out_edges, pi_begin, false);
-				if(prob_sum == 0.0) throw std::logic_error("hmm has no begin transition");
-			}
-			
-			/* Fill end transitions. Throw exception if end state has successors. */
-			else if(state == end()){
-				if(_graph.get_out_edges(state).size() > 0) throw std::logic_error("end state cannot have successors");
-				std::vector<Edge<State>*> in_edges = _graph.get_in_edges(state);
-				/* Do not normalize. */
-				double prob_sum = fill_normalize(in_edges, pi_end, true, false);
-				/* Determine whether the hmm is finite by summing the end state in transitions probabilities. */
-				if(prob_sum > 0.0) finite = true;
-			}
-			else{
-				/* Fill normal transitions aka matrix A. */
-				std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
-				out_edges.erase(std::remove_if(out_edges.begin(), out_edges.end(), [this](const Edge<State>* edge){
-						return ((*(edge->to())) == end()) ? true : false;
-					}), out_edges.end());
-				double prob_sum = fill_normalize(out_edges, A[states_indices[state.name()]], false);
-				if(prob_sum == 0.0) throw std::logic_error("hmm has no transition from " + state.to_string());
-			}
+			/* Fill normal transitions aka matrix A. */
+			std::vector<Edge<State>*> out_edges = _graph.get_out_edges(state);
+			double prob_sum = fill_normalize(out_edges, A[states_indices[state.name()]]);
+			if(prob_sum == 0.0) { throw std::logic_error("hmm has no transition from " + state.to_string()); }
 		}
+
+		/* Determine whether the hmm is finite by summing the end state in transitions probabilities. */
+		double prob_sum_to_end = utils::kNegInf;
+		for(std::size_t i = 0; i < num_states(); ++i) { prob_sum_to_end += exp(A[i][0]); }
+		if(prob_sum_to_end > 0.0) { finite = true; }
+
 		/* Fill emission matrix with the states PDFs. */
-		std::vector<Distribution*> B(states.size() - 2);
+		std::vector<Distribution*> B(num_states - 2);
 		for(const State* p_state : states){
 			const State& state = *p_state;
 			if(state != begin() && state != end()){
