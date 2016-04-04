@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm> // std::find, std::remove, std::remove_if
 #include <vector>
+#include <queue>
 #include <string>
 #include <utility> // std::pair
 #include "constants.hpp"
@@ -265,12 +266,15 @@ class Graph{
 	If an incident vertex is not contained by the graph, 
 	throws en exception. */
 	void _add_edge(const Edge<VertexElementBase>& edge){
-		if(! has_vertex(*(edge.from()))) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.from()), error_message::kIncidentVertexNotFound);
-		if(! has_vertex(*(edge.to()))) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.to()), error_message::kIncidentVertexNotFound);
+		typename std::vector<VertexElementBase*>::const_iterator it_from;
+		typename std::vector<VertexElementBase*>::const_iterator it_to;
+		if((it_from = _find_vertex(*(edge.from()))) == _vertices.end()) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.from()), error_message::kIncidentVertexNotFound);
+		if((it_to = _find_vertex(*(edge.to()))) == _vertices.end()) throw IncidentVertexNotFoundException<VertexElementBase>(*(edge.to()), error_message::kIncidentVertexNotFound);
 		
 		if(! has_edge(edge)){
 			_edges.reserve(_edges.size() + 1);
-			_edges.push_back(new Edge<VertexElementBase>(edge));
+			(edge.weight() != nullptr) ? _edges.push_back(new Edge<VertexElementBase>(**it_from, **it_to, *edge.weight())) : 
+										 _edges.push_back(new Edge<VertexElementBase>(**it_from, **it_to));
 		}
 		else{
 			throw EdgeExistsException<Edge<VertexElementBase>>(edge, error_message::kAddedEdgeExists);
@@ -364,6 +368,48 @@ class Graph{
 		}
 	}
 
+	Graph<VertexElementBase> _sub_graph(const std::vector<VertexElementBase>& vertices) const {
+		Graph<VertexElementBase> sub;
+		/* Add vertices. */
+		for(const VertexElementBase& vertex : vertices){
+			sub.add_vertex(vertex);
+		}
+		/* Add edges. */
+		for(const VertexElementBase& vertex_from : vertices){
+			for(const VertexElementBase& vertex_to : vertices){
+				typename std::vector<Edge<VertexElementBase>*>::const_iterator it;
+				if((it = _find_edge(Edge<VertexElementBase>(vertex_from, vertex_to))) != _edges.end()) {
+					sub._add_edge(**it);
+				}
+			}
+		}
+		return sub;
+	}
+
+	void _topological_sort() {
+		std::map<VertexElementBase*, std::size_t> pred;
+		std::vector<VertexElementBase*> L;
+		std::queue<VertexElementBase*> Q;
+		for(VertexElementBase* vertex : _vertices){
+			std::size_t num_preds = get_in_edges(*vertex).size(); 
+			pred[vertex] = num_preds;
+			if(num_preds == 0) Q.push(vertex);
+		}
+		while(! Q.empty()){
+			VertexElementBase* vertex = Q.front();
+			Q.pop();
+			L.push_back(vertex);
+			for(Edge<VertexElementBase>* edge : get_out_edges(*vertex)){
+				VertexElementBase* to_vertex = const_cast<VertexElementBase*>(edge->to()); 
+				std::size_t& num_preds = pred[to_vertex];
+				--num_preds;
+
+				if(num_preds == 0) Q.push(to_vertex);
+			}
+		}
+		_vertices = L;
+	}
+
 	/* Removes all the edges. Deletes the dynamically allocated edges before
 	calling the standard clear on the vector. */
 	void _clear_all_edges() {
@@ -388,6 +434,20 @@ class Graph{
 public:
 	/* Graph interface */
 	Graph() : _vertices(), _edges() {}
+
+	Graph(const Graph<VertexElementBase>& other) : _vertices(), _edges() {
+		_vertices.reserve(other._vertices.size());
+		for(std::size_t i = 0; i < other._vertices.size(); ++i){
+			_vertices[i] = new VertexElementBase(*(other._vertices[i]));
+		}
+		_edges.reserve(other._edges.size());
+		for(std::size_t i = 0; i < other._edges.size(); ++i){
+			_edges[i] = new Edge<VertexElementBase>(*(other._edges[i]));
+		}
+	}
+
+	Graph(Graph<VertexElementBase>&& other) :
+		_vertices(std::move(other._vertices)), _edges(std::move(other._edges)) {}
 
 	std::size_t num_vertices() const { return _vertices.size(); }
 	std::size_t num_edges() const { return _edges.size(); }
@@ -472,6 +532,14 @@ public:
 
 	std::vector<Edge<VertexElementBase>*> get_out_edges(const VertexElementBase& vertex) const {
 		return _get_out_edges(vertex);
+	}
+
+	Graph<VertexElementBase> sub_graph(const std::vector<VertexElementBase>& vertices) const {
+		return _sub_graph(vertices);
+	}
+
+	void topological_sort() {
+		_topological_sort();
 	}
 
 	void clear_all_edges() {

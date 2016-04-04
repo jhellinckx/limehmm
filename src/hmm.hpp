@@ -11,6 +11,7 @@
 #include <math.h>	// log, exp
 #include <utility>	// std::pair
 #include <memory> // std::shared_ptr
+#include <iomanip> // std::setprecision
 #include "constants.hpp"
 #include "state.hpp"
 #include "graph.hpp"
@@ -41,7 +42,7 @@ std::ostream& operator<<(std::ostream& out, const Matrix<double>& matrix){
 
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
 	for(double d : vec){
-		out << d << " ";
+		out << exp(d) << " ";
 	}
 	out << std::endl;
 	return out;
@@ -277,7 +278,6 @@ public:
 		for(State* p_state : states){
 			State& state = *p_state;
 			if(state != begin() && state != end()){
-				if(state.is_silent()) throw std::runtime_error("silent non-begin/end states not yet supported");
 				A[i] = std::vector<double>(states.size() - 2, utils::kNegInf);
 				states_indices[state.name()] = i;
 				states_names[i] = state.name();
@@ -332,9 +332,11 @@ public:
 		for(const State* p_state : states){
 			const State& state = *p_state;
 			if(state != begin() && state != end()){
-				if(state.is_silent()) throw std::runtime_error("silent non-begin/end states not yet supported");
-				Distribution* distribution = state.distribution().clone();
-				distribution->log_normalize();
+				Distribution* distribution = nullptr;
+				if(! state.is_silent()) {
+					distribution = state.distribution().clone();
+					distribution->log_normalize();
+				}
 				B[states_indices[state.name()]] = distribution;
 			}
 		}
@@ -361,7 +363,8 @@ public:
 		auto init_forward = [&symbols, this]() -> std::vector<double> {
 			std::vector<double> init_fwd(_pi_begin.size());
 			for(std::size_t i = 0; i < _pi_begin.size(); ++i){
-				init_fwd[i] = _pi_begin[i] + (*_B[i])[symbols[0]];
+				// Check if state is silent.
+				init_fwd[i] = (_B[i] != nullptr) ? _pi_begin[i] + (*_B[i])[symbols[0]] : _pi_begin[i];
 			}
 			return init_fwd;
 		};
@@ -372,7 +375,7 @@ public:
 				for(std::size_t i = 0; i < _A.size(); ++i){
 					prob_sum = utils::sum_log_prob(prob_sum, previous_fwd[i] + _A[i][j]);	
 				}
-				current_fwd[j] = prob_sum + (*_B[j])[symbols[t]];
+				current_fwd[j] = (_B[j] != nullptr) ? prob_sum + (*_B[j])[symbols[t]] : prob_sum;
 			}
 			return current_fwd;
 		};
@@ -408,8 +411,10 @@ public:
 			std::vector<double> current_bwd(_A.size());
 			for(std::size_t i = 0; i < _A.size(); ++i){
 				double prob_sum = utils::kNegInf;
+				double bwd_mul;
 				for(std::size_t j = 0; j < _A.size(); ++j){
-					prob_sum = utils::sum_log_prob(prob_sum, _A[i][j] + (*_B[j])[symbols[t]] + next_bwd[j]) ;	
+					bwd_mul = (_B[j] != nullptr) ? _A[i][j] + (*_B[j])[symbols[t]] + next_bwd[j] : _A[i][j] + next_bwd[j];
+					prob_sum = utils::sum_log_prob(prob_sum, bwd_mul);	
 				}
 				current_bwd[i] = prob_sum;
 			}
@@ -447,8 +452,10 @@ public:
 		else{
 			std::vector<double> bwd = backward(symbols);
 			double prob_sum = utils::kNegInf;
+			double bwd_mul;
 			for(std::size_t i = 0; i < bwd.size(); ++i){
-				prob_sum = utils::sum_log_prob(prob_sum, _pi_begin[i] + (*_B[i])[symbols[0]] + bwd[i]) ;	
+				bwd_mul = (_B[i] != nullptr) ? _pi_begin[i] + (*_B[i])[symbols[0]] + bwd[i] : _pi_begin[i] + bwd[i];
+				prob_sum = utils::sum_log_prob(prob_sum, bwd_mul);	
 			}
 			return prob_sum;
 		}
@@ -508,7 +515,7 @@ public:
 	};
 
 	template<typename Symbol>
-	std::vector<std::string> viterbi(const std::vector<Symbol>& symbols) {
+	std::pair<std::vector<std::string>, double> viterbi(const std::vector<Symbol>& symbols) {
 		auto init_viterbi = [&symbols, this]() -> std::pair<std::vector<double>, Traceback>{
 			std::vector<double> init_delta(_pi_begin.size());
 			for(std::size_t i = 0; i < _pi_begin.size(); ++i){
@@ -530,33 +537,37 @@ public:
 						max_i = i;
 					}
 				}
+				std::cout << j << "->" << max_i << " "; 
 				current_delta[j] = max_delta + (*_B[j])[symbols[t]];
 				psi.add_link(max_i, j);
 			}
+			std::cout << std::endl;
 			psi.next_column();
 			return current_delta;
 		};
 
-		auto terminate_viterbi = [&symbols, this](const std::vector<double>& delta, Traceback& psi) -> std::vector<std::string> {
+		auto terminate_viterbi = [&symbols, this](const std::vector<double>& delta, Traceback& psi) -> std::pair<std::vector<std::string>, double> {
 			std::size_t max_delta = (std::size_t) (std::max_element(delta.begin(), delta.end()) - delta.begin());
 			std::vector<std::size_t> path_indices = psi.trace_back(max_delta, symbols.size());
 			std::vector<std::string> path(path_indices.size());
 			for(std::size_t i = 0; i < path_indices.size(); ++i) {
 				path[i] = _states_names[path_indices[i]];
 			}
-			return path;
+			return std::make_pair(path, delta[max_delta]);
 		};
 		std::pair<std::vector<double>, Traceback> init_viter = init_viterbi();
 		std::vector<double> delta = init_viter.first;
 		Traceback psi = init_viter.second;
+		std::cout << delta << std::endl;
 		for(std::size_t t = 0; t < symbols.size(); ++t){
 			delta = iter_viterbi(delta, psi, t);
+			std::cout << delta << std::endl;
 		}
 		return terminate_viterbi(delta, psi);
 	}
 
 	template<typename Symbol>
-	std::vector<std::string> decode(std::vector<Symbol>& symbols) {
+	std::pair<std::vector<std::string>, double> decode(std::vector<Symbol>& symbols) {
 		return viterbi(symbols);
 	}
 

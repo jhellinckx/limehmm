@@ -9,6 +9,7 @@
 #include <string>
 #include <stdlib.h>
 #include <math.h>
+#include <utility>
 #include "utils.hpp"
 #include "hmm.hpp" // tested hmm library
 
@@ -107,6 +108,44 @@ int main(){
 			"platform type",
 			ASSERT_ABORT(std::numeric_limits<double>::is_iec559, "IEEE 754 required");
 		)
+
+		TEST_UNIT(
+			"graph",
+			/* Topological sort. */
+			Graph<std::string> g;
+			g.add_vertex("B");
+			g.add_vertex("E");
+			g.add_vertex("A");
+			g.add_vertex("D");
+			g.add_vertex("C");
+			g.add_edge("A", "B");
+			g.add_edge("A", "D");
+			g.add_edge("B", "C");
+			g.add_edge("C", "D");
+			g.add_edge("D", "E");
+			g.add_edge("C", "E");
+			std::vector<std::string> precomputed_toposort({"A", "B", "C", "D", "E"}); 
+			g.topological_sort();
+			std::vector<std::string*> vertices = g.get_vertices();
+			std::vector<std::string> toposort;
+			for(std::string* str_ptr : vertices) {
+				toposort.push_back(*str_ptr);
+			}
+			ASSERT(toposort == precomputed_toposort);
+			std::vector<std::string> sub_vertices({"C","E"});
+			Graph<std::string> subgraph = g.sub_graph(sub_vertices);
+			std::vector<std::string> sub_graph_vertices;
+			std::vector<std::string*> sub_ptrs = subgraph.get_vertices();
+			for(std::string* sub_ptr : sub_ptrs){
+				sub_graph_vertices.push_back(*sub_ptr);
+			}
+			ASSERT(sub_graph_vertices == sub_vertices);
+			ASSERT(subgraph.has_edge("C", "E"));
+			ASSERT(!subgraph.has_vertex("A"));
+			ASSERT(!subgraph.has_vertex("B"));
+			ASSERT(!subgraph.has_vertex("D"));
+		)
+
 
 		TEST_UNIT(
 			"state creation/distribution",
@@ -436,34 +475,122 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi decode",
+			"viterbi decode (2 states)",
 			HiddenMarkovModel hmm;
-			DiscreteDistribution dist({{"H", 0.5}, {"T", 0.5}});
-			State s1 = State("s1", dist);
-			hmm.add_state(s1);
-			dist["H"] = 0.4;
-			dist["T"] = 0.6;
-			State s2 = State("s2", dist);
-			hmm.add_state(s2);
-			dist["H"] = 0.7;
-			dist["T"] = 0.3;
-			State s3 = State("s3", dist);
-			hmm.add_state(s3);
-			hmm.add_transition(s1, s1, 0.4);
-			hmm.add_transition(s1, s2, 0.3);
-			hmm.add_transition(s1, s3, 0.3);
-			hmm.add_transition(s2, s2, 0.4);
-			hmm.add_transition(s2, s1, 0.3);
-			hmm.add_transition(s2, s3, 0.3);
-			hmm.add_transition(s3, s3, 0.4);
-			hmm.add_transition(s3, s2, 0.3);
-			hmm.add_transition(s3, s1, 0.3);
-			std::vector<std::string> symbols({"T", "H", "H", "H", "T", "T", "H", "H"});
-			std::vector<std::string> precomputed_viterbi_path({"s2", "s2", "s3", "s3", "s3", "s2", "s2", "s2"});
-			ASSERT(hmm.viterbi(symbols) == precomputed_viterbi_path);
+			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
+			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
+			State fair = State("F", fair_dist);
+			State biased = State("B", biased_dist);
+			hmm.add_state(fair);
+			hmm.add_transition(hmm.begin(), fair, 0.5);
+			hmm.add_state(biased);
+			hmm.add_transition(hmm.begin(), biased, 0.5);
+			hmm.add_transition(fair, fair, 0.9);
+			hmm.add_transition(fair, biased, 0.1);
+			hmm.add_transition(biased, biased, 0.9);
+			hmm.add_transition(biased, fair, 0.1);
+			hmm.brew();
+			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			std::vector<std::string> precomputed_viterbi_path_2_states({"F", "F", "F", "F", "F", "F", "F", "F"});
+			std::vector<std::string> viterbi_path_2_states = hmm.viterbi(symbols).first;
+			ASSERT(viterbi_path_2_states == precomputed_viterbi_path_2_states);
 		)
 
-	
+		TEST_UNIT(
+			"viterbi decode (10 states profile hmm)",
+			HiddenMarkovModel hmm;
+			DiscreteDistribution i_d({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
+			/* Create insert statse. */
+			State i0 = State("I0", i_d);
+			State i1 = State("I1", i_d);
+			State i2 = State("I2", i_d);
+			State i3 = State("I3", i_d);
+			/* Create match states. */
+			State m1 = State("M1", DiscreteDistribution({{"A", 0.95},  {"C", 0.01}, {"G", 0.01},  {"T", 0.02 }}));
+			State m2 = State("M2", DiscreteDistribution({{"A", 0.003}, {"C", 0.99}, {"G", 0.003}, {"T", 0.004}}));
+			State m3 = State("M3", DiscreteDistribution({{"A", 0.01},  {"C", 0.01}, {"G", 0.01},  {"T", 0.97 }}));
+			/* Create delete states. */
+			State d1 = State("D1");
+			State d2 = State("D2");
+			State d3 = State("D3");
+			/* Add all the states. */
+			hmm.add_state(i0);
+			hmm.add_state(i1);
+			hmm.add_state(i2);
+			hmm.add_state(i3);
+			hmm.add_state(m1);
+			hmm.add_state(m2);
+			hmm.add_state(m3);
+			hmm.add_state(d1);
+			hmm.add_state(d2);
+			hmm.add_state(d3);
+			/* Transitions from match states. */
+			hmm.add_transition(hmm.begin(), m1, 0.9);
+			hmm.add_transition(hmm.begin(), i0, 0.1);
+			hmm.add_transition(m1, m2, 0.9);
+			hmm.add_transition(m1, i1, 0.05);
+			hmm.add_transition(m1, d2, 0.05);
+			hmm.add_transition(m2, m3, 0.9);
+			hmm.add_transition(m2, i2, 0.05);
+			hmm.add_transition(m2, d3, 0.05);
+			hmm.add_transition(m3, hmm.end(), 0.9);
+			hmm.add_transition(m3, i3, 0.1);
+			/* Transitions from insert states. */
+			hmm.add_transition(i0, i0, 0.70);
+			hmm.add_transition(i0, d1, 0.15);
+			hmm.add_transition(i0, m1, 0.15);
+			hmm.add_transition(i1, i1, 0.70);
+			hmm.add_transition(i1, d2, 0.15);
+			hmm.add_transition(i1, m2, 0.15);
+			hmm.add_transition(i2, i2, 0.70);
+			hmm.add_transition(i2, d3, 0.15);
+			hmm.add_transition(i2, m3, 0.15);
+			hmm.add_transition(i3, i3, 0.85);
+			hmm.add_transition(i3, hmm.end(), 0.15);
+			/* Transitions from delete states. */
+			hmm.add_transition(d1, d2, 0.15);
+			hmm.add_transition(d1, i1, 0.15);
+			hmm.add_transition(d1, m2, 0.70);
+			hmm.add_transition(d2, d3, 0.15);
+			hmm.add_transition(d2, i2, 0.15);
+			hmm.add_transition(d2, m3, 0.70);
+			hmm.add_transition(d3, i3, 0.30);
+			hmm.add_transition(d3, hmm.end(), 0.70);
+			// hmm.brew();
+			// std::vector<std::vector<std::string>> sequences(4);
+			// sequences[0] = std::vector<std::string>({{"A","C","T"}});
+			// sequences[1] = std::vector<std::string>({{"G","G","C"}});
+			// sequences[2] = std::vector<std::string>({{"G","A","T"}});
+			// sequences[3] = std::vector<std::string>({{"A","C","C"}});
+			// double seq1_viterbi_log_likelihood_precomputed = -0.513244900357;
+			// double seq2_viterbi_log_likelihood_precomputed = -11.0481012413;
+			// double seq3_viterbi_log_likelihood_precomputed = -9.12551967402;
+			// double seq4_viterbi_log_likelihood_precomputed = -5.08795587886;
+			// std::vector<std::string> seq1_viterbi_path_precomputed({"M1", "M2", "M3"});
+			// std::vector<std::string> seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
+			// std::vector<std::string> seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
+			// std::vector<std::string> seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
+			// auto viterbi_seq1 = hmm.viterbi(sequences[0]);
+			// auto viterbi_seq2 = hmm.viterbi(sequences[1]);
+			// auto viterbi_seq3 = hmm.viterbi(sequences[2]);
+			// auto viterbi_seq4 = hmm.viterbi(sequences[3]);
+			// double seq1_viterbi_log_likelihood = utils::round_double(viterbi_seq1.second);
+			// double seq2_viterbi_log_likelihood = utils::round_double(viterbi_seq2.second);
+			// double seq3_viterbi_log_likelihood = utils::round_double(viterbi_seq3.second);
+			// double seq4_viterbi_log_likelihood = utils::round_double(viterbi_seq4.second);
+			// //ASSERT(seq1_viterbi_log_likelihood == seq1_viterbi_log_likelihood_precomputed);
+			// //ASSERT(seq2_viterbi_log_likelihood == seq2_viterbi_log_likelihood_precomputed);
+			// //ASSERT(seq3_viterbi_log_likelihood == seq3_viterbi_log_likelihood_precomputed);
+			// //ASSERT(seq4_viterbi_log_likelihood == seq4_viterbi_log_likelihood_precomputed);
+			// std::vector<std::string> seq1_viterbi_path = viterbi_seq1.first;
+			// std::vector<std::string> seq2_viterbi_path = viterbi_seq2.first;
+			// std::vector<std::string> seq3_viterbi_path = viterbi_seq3.first;
+			// std::vector<std::string> seq4_viterbi_path = viterbi_seq4.first;
+			// //ASSERT(seq1_viterbi_path == seq1_viterbi_path_precomputed);
+			// //ASSERT(seq2_viterbi_path == seq2_viterbi_path_precomputed);
+			// //ASSERT(seq3_viterbi_path == seq3_viterbi_path_precomputed);
+			// //ASSERT(seq4_viterbi_path == seq4_viterbi_path_precomputed);
+	)	
 		/* Train Viterbi */
 
 		/* Train B-W */
