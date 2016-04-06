@@ -461,36 +461,51 @@ public:
 	std::vector<double> backward(const SymbolContainer& symbols, std::size_t t_min = 0) {
 		if(t_min == 0) t_min = 1;
 		auto init_backward = [this]() -> std::vector<double> {
-			std::vector<double> init_bwd(_pi_end.size());
+			std::vector<double> init_bwd(_A.size());
 			if(_is_finite){
-				for(std::size_t i = 0; i < _pi_end.size(); ++i){
-					init_bwd[i] = _pi_end[i];
+				for(std::size_t i = 0; i < _A.size(); ++i){
+					init_bwd[i] = _A[i][0];
 				}
 			}
 			else{
-				for(std::size_t i = 0; i < _pi_end.size(); ++i){
-					init_bwd[i] = 0.0; // log(1) = 0.0 ! 
+				for(std::size_t i = 0; i < _A.size(); ++i){
+					init_bwd[i] = 0.0;
 				}
 			}
 			return init_bwd;
 		};
 		auto iter_backward = [&symbols, this](const std::vector<double>& next_bwd, std::size_t t) -> std::vector<double> {
 			std::vector<double> current_bwd(_A.size());
-			for(std::size_t i = 0; i < _A.size(); ++i){
+			/* Normale states first. */
+			for(std::size_t j = 0; j < _silent_states_index; ++j){
 				double prob_sum = utils::kNegInf;
-				double bwd_mul;
-				for(std::size_t j = 0; j < _A.size(); ++j){
-					bwd_mul = (_B[j] != nullptr) ? _A[i][j] + (*_B[j])[symbols[t]] + next_bwd[j] : _A[i][j] + next_bwd[j];
-					prob_sum = utils::sum_log_prob(prob_sum, bwd_mul);	
+				for(std::size_t i = 0; i < _A.size(); ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, _A[j][i] + (*_B[i])[symbols[t + 1]] + next_bwd[i]);	
 				}
-				current_bwd[i] = prob_sum;
+				current_bwd[j] = prob_sum;
+			}
+			/* Do first iteration over silent states j with i == normal state. */
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				double prob_sum = utils::kNegInf;
+				for(std::size_t i = 0; i < _silent_states_index; ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[i][j]);
+				}
+				current_bwd[j] = prob_sum;
+			}
+			/* Do second iteration over silent states j with i == silent state < j. Reverse topological order. */
+			for(std::size_t j = _A.size() - 1; j >= _silent_states_index; --j){
+				double prob_sum = current_bwd[j];
+				for(std::size_t i = _A.size() - 1; i > j; --i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[j][i]);
+				}
+				current_bwd[j] = prob_sum;
 			}
 			return current_bwd;
 		};
 		if(symbols.size() == 0) throw std::runtime_error("backward on empty symbol list");
 		else{
 			std::vector<double> bwd = init_backward();
-			for(std::size_t t = symbols.size() - 1; t >= t_min && t < symbols.size(); --t){
+			for(std::size_t t = symbols.size() - 2; t >= t_min && t < symbols.size(); --t){
 				bwd = iter_backward(bwd, t);
 			}
 			return bwd;
