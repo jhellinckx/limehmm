@@ -142,6 +142,8 @@ private:
 	std::vector<std::string> _states_names;
 	Matrix<double> _A;
 	std::vector<Distribution*> _B;
+	std::vector<double> _pi_begin;
+	std::vector<double>_pi_end;
 	bool _is_finite;
 	std::size_t _silent_states_index;
 	std::size_t _M; //TODO
@@ -154,6 +156,8 @@ private:
 		_states_indices.clear();
 		_states_names.clear();
 		_A.clear();
+		_pi_begin.clear();
+		_pi_end.clear();
 		_is_finite = false;
 		_silent_states_index = std::size_t();
 		_M = std::size_t(); 
@@ -280,40 +284,35 @@ public:
 
 		/* Get the states from graph. */
 		std::vector<State*> states = _graph.get_vertices();
-		std::size_t num_states = states.size(); 
 
 		/* Remove begin and end states. */
 		states.erase(std::remove(states.begin(), states.end(), [this](State* p_state){ return (*p_state) == begin() || (*p_state) == end(); }), states.end());
 		std::vector<State*> silent_states;
+		std::size_t num_states = states.size();
 
 		/* Keep track of the matrix index of each state. */
 		std::map<std::string, std::size_t> states_indices;
 		std::vector<std::string> states_names(num_states);
 
-		/* Raw transition matrix. Init its size. 
-		Begin and state transitions are stored in first row and first column, respectively.
-		We therefore set its size to M - 1. */
-		Matrix<double> A(num_states - 1);
+		/* Init size of raw transition matrix. */
+		Matrix<double> A(num_states);
+		std::vector<double> pi_begin(num_states);
+		std::vector<double> pi_end(num_states);
 
-		/* Transitions to end state exist and is not empty. */
+		/* Transitions to end state exist and are not empty. */
 		bool finite = false;
 
-		/* Check if silent/end states are silent. */
+		/* Check if silent/end states are indeed silent. */
 		if(!begin().is_silent()) { throw std::logic_error("begin state has to be silent."); }
 		if(!end().is_silent()) { throw std::logic_error("end state has to be silent."); }
 
-		/* State index start at 1, first row/column is reserved for begin/end state. */
-		states_indices[begin().name()] = 0;
-		states_indices[end().name()] = 0;
-		/* Default values set to negative infinity since we use log probabilites. */
-		A[0] = std::vector<double>(num_states - 1, utils::kNegInf);
-		std::size_t normal_states_index = 1;
+		std::size_t normal_states_index = 0;
 		for(State* p_state : states){
 			if(p_state->is_silent()) {
 				silent_states.push_back(p_state);
 			}
 			else{
-				A[normal_states_index] = std::vector<double>(num_states - 1, utils::kNegInf);
+				A[normal_states_index] = std::vector<double>(num_states, utils::kNegInf);
 				/* Map state name to row index. */
 				states_indices[p_state->name()] = normal_states_index;
 				states_names[normal_states_index] = p_state->name();
@@ -335,24 +334,35 @@ public:
 		silent_states = subgraph.get_vertices();
 		/* Init the toposorted silent states rows in the matrix. */
 		for(State* p_silent_state : silent_states){
-			A[silent_states_index] = std::vector<double>(num_states - 1, utils::kNegInf);
+			A[silent_states_index] = std::vector<double>(num_states, utils::kNegInf);
 			states_indices[p_silent_state->name()] = silent_states_index;
 			states_names[silent_states_index] = p_silent_state->name();
 			++silent_states_index;
 		}
 
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
-		auto fill_normalize = [&states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill) {
-			auto state_index = [&states_indices](const Edge<State>* edge){ return states_indices[edge->to()->name()]; };
+		auto fill_normalize = [&states_indices, &pi_end] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill) {
+			std::vector<double> vec_to_normalize;
+			vec_to_normalize.reserve(edges.size());
 			double prob_sum = 0;
 			double prob;
-			for(Edge<State>* edge : edges){
+			for(Edge<State>* edge : edges){ 
 				prob = (edge->weight() == nullptr) ? 0 : *(edge->weight());
 				prob_sum += prob;
-				prob_vec_to_fill[state_index(edge)] = log(prob);
+				vec_to_normalize.push_back(log(prob));
 			}
 			if(prob_sum != 1.0){
-				utils::for_each_log_normalize(prob_vec_to_fill.begin(), prob_vec_to_fill.end(), log(prob_sum));
+				utils::for_each_log_normalize(vec_to_normalize.begin(), vec_to_normalize.end(), log(prob_sum));
+			}
+			std::size_t i = 0;
+			for(double& log_prob : vec_to_normalize){
+				if(*(edges[i]->to()) == end()){
+					pi_end[states_indices[edges[i]->from()->name()]] = log_prob;
+				}
+				else{
+					prob_vec_to_fill[states_indices[edges[i]->to()->name()]] = log_prob;
+				}
+				i++;
 			}
 			return prob_sum;
 		};
@@ -362,7 +372,7 @@ public:
 		if(_graph.get_in_edges(begin_state).size() > 0) { throw std::logic_error("begin state cannot have predecessors"); }
 		std::vector<Edge<State>*> out_edges = _graph.get_out_edges(begin_state);
 		/* Begin transitions are added in the first row of A s.t. A[0][i] == pi[i]. */
-		double prob_sum = fill_normalize(out_edges, A[0]);
+		double prob_sum = fill_normalize(out_edges, pi_begin);
 		if(prob_sum == 0.0) { throw std::logic_error("hmm has no begin transition"); }
 		
 		/* Check if end state has out edges. */
@@ -396,6 +406,8 @@ public:
 		/* Set fields for the hmm raw values. */
 		_A = std::move(A);
 		_B = std::move(B);
+		_pi_begin = std::move(pi_begin);
+		_pi_end = std::move(pi_end);
 		_states_indices = std::move(states_indices);
 		_states_names = std::move(states_names);
 		_is_finite = finite;
@@ -410,13 +422,19 @@ public:
 	std::vector<double> forward(const SymbolContainer& symbols, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = symbols.size();
 		auto init_forward = [&symbols, this]() -> std::vector<double> {
-			std::vector<double> init_fwd(_A.size());
-			/* Begin state has probability of 1 (log is 0), others 0 (log is negative infinity). */
-			init_fwd[0] = 0.0;
-			for(std::size_t i = 1; i < _A.size(); ++i) { 
-				init_fwd[i] = utils::kNegInf;
+			/* First iterate over non-silent states. */
+			std::vector<double> alpha_1(_A.size());
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				alpha_1[i] = _pi_begin[i] + (*_B[i])[0];
 			}
-			return init_fwd;
+			/* Then silent states, in toporder. */
+			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+				alpha_1[i] = _pi_begin[i];
+				for(std::size_t j = 0; j < i; ++j){
+					alpha_1[i] = utils::sum_log_prob(alpha_1[i], _A[j][i] + alpha_1[j]);
+				}
+			}
+			return alpha_1;
 		};
 		auto iter_forward = [&symbols, this](const std::vector<double>& previous_fwd, std::size_t t) -> std::vector<double> {
 			std::vector<double> current_fwd(_A.size());
@@ -534,13 +552,27 @@ public:
 		}
 		else{
 			std::vector<double> bwd = backward(symbols);
-			double prob_sum = utils::kNegInf;
-			double bwd_mul;
-			for(std::size_t i = 0; i < bwd.size(); ++i){
-				bwd_mul = (_B[i] != nullptr) ? _pi_begin[i] + (*_B[i])[symbols[0]] + bwd[i] : _pi_begin[i] + bwd[i];
-				prob_sum = utils::sum_log_prob(prob_sum, bwd_mul);	
+			/* Normal states first. */
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				bwd[i] = _A[0][i] + (*_B[i])[symbols[0]] + bwd[i];	
 			}
-			return prob_sum;
+			/* Do first iteration over silent states j with i == normal state. */
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				double prob_sum = utils::kNegInf;
+				for(std::size_t i = 0; i < _silent_states_index; ++i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[i][j]);
+				}
+				current_bwd[j] = prob_sum;
+			}
+			/* Do second iteration over silent states j with i == silent state < j. Reverse topological order. */
+			for(std::size_t j = _A.size() - 1; j >= _silent_states_index; --j){
+				double prob_sum = current_bwd[j];
+				for(std::size_t i = _A.size() - 1; i > j; --i){
+					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[j][i]);
+				}
+				current_bwd[j] = prob_sum;
+			}
+			return current_bwd;
 		}
 	}
 
