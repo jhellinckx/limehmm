@@ -476,32 +476,42 @@ public:
 			}
 			return alpha_t;
 		};
-		auto forward_terminate = [&symbols, this](const std::vector<double>& alpha_t) {
-			if(_is_finite){
-				for(std::size_t i = 0; i < alpha_t.size(); ++i){
-					alpha_t = alpha_t + _pi_end[i];
-				}
-			}
-		}
-		
 		if(symbols.size() == 0) throw std::logic_error("forward on empty symbol list");
 		else{
-			std::vector<double> fwd = init_forward();
+			std::vector<double> alpha = init_forward();
 			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t) {
-				fwd = iter_forward(fwd, t);
+				alpha = iter_forward(alpha, t);
 			}
-			return fwd;
+			return alpha;
 		}
+	}
+
+	std::pair<std::vector<double>, double> terminate_forward(std::vector<double> alpha_T){
+		double log_prob = utils::kNegInf;
+		if(_is_finite){
+			/* Sum all and add end transitions. */
+			for(std::size_t i = 0; i < alpha_T.size(); ++i){
+				alpha_T[i] = alpha_T[i] + _pi_end[i];
+				log_prob = utils::sum_log_prob(log_prob, alpha_T[i]);
+			}
+		}
+		else{
+			/* Non finite hmm end in non-silent states. */
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				log_prob = utils::sum_log_prob(log_prob, alpha_T[i]);
+			}
+		}
+		return std::make_pair(alpha_T, log_prob);
 	}
 
 	template<typename SymbolContainer>
 	std::vector<double> backward(const SymbolContainer& symbols, std::size_t t_min = 0) {
 		if(t_min == 0) t_min = 1;
-		auto init_backward = [this]() -> std::vector<double> {
-			std::vector<double> init_bwd(_A.size());
+		auto init_backward = [this]() {
+			std::vector<double> beta_T(_A.size());
 			if(_is_finite){
 				for(std::size_t i = 0; i < _A.size(); ++i){
-					init_bwd[i] = _A[i][0];
+					beta_T[i] = _pi_end[i];
 				}
 			}
 			else{
@@ -511,7 +521,7 @@ public:
 			}
 			return init_bwd;
 		};
-		auto iter_backward = [&symbols, this](const std::vector<double>& next_bwd, std::size_t t) -> std::vector<double> {
+		auto backward_step = [&symbols, this](const std::vector<double>& next_bwd, std::size_t t) -> std::vector<double> {
 			std::vector<double> current_bwd(_A.size());
 			/* Normale states first. */
 			for(std::size_t j = 0; j < _silent_states_index; ++j){
@@ -539,6 +549,7 @@ public:
 			}
 			return current_bwd;
 		};
+		auto backward_terminate = [&symbols, this](const std::vector<double>& next_bwd)
 		if(symbols.size() == 0) throw std::runtime_error("backward on empty symbol list");
 		else{
 			std::vector<double> bwd = init_backward();
@@ -552,47 +563,34 @@ public:
 	template<typename Symbol>
 	double log_likelihood(const std::vector<Symbol>& symbols, bool do_fwd = true){
 		if(do_fwd){
-			std::vector<double> fwd = forward(symbols);
-			if(_is_finite){
-				double prob_sum = utils::kNegInf;
-				/* First column of each row has the end state probability. */
-				for(std::size_t i = 0; i < fwd.size(); ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, fwd[i] + _A[i][0]);
-				}
-				return prob_sum;
-			}
-			else{
-				double prob_sum = utils::kNegInf;
-				for(std::size_t i = 0; i < fwd.size(); ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, fwd[i]);
-				}
-				return prob_sum;
-			}
+			return terminate_forward(forward(symbols)).second
 		}
 		else{
-			std::vector<double> bwd = backward(symbols);
-			/* Normal states first. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				bwd[i] = _A[0][i] + (*_B[i])[symbols[0]] + bwd[i];	
-			}
-			/* Do first iteration over silent states j with i == normal state. */
-			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-				double prob_sum = utils::kNegInf;
-				for(std::size_t i = 0; i < _silent_states_index; ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[i][j]);
-				}
-				current_bwd[j] = prob_sum;
-			}
-			/* Do second iteration over silent states j with i == silent state < j. Reverse topological order. */
-			for(std::size_t j = _A.size() - 1; j >= _silent_states_index; --j){
-				double prob_sum = current_bwd[j];
-				for(std::size_t i = _A.size() - 1; i > j; --i){
-					prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[j][i]);
-				}
-				current_bwd[j] = prob_sum;
-			}
-			return current_bwd;
+			return terminate_backward(backward(symbols)).second
 		}
+			// std::vector<double> bwd = backward(symbols);
+			// /* Normal states first. */
+			// for(std::size_t i = 0; i < _silent_states_index; ++i){
+			// 	bwd[i] = _A[0][i] + (*_B[i])[symbols[0]] + bwd[i];	
+			// }
+			// /* Do first iteration over silent states j with i == normal state. */
+			// for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+			// 	double prob_sum = utils::kNegInf;
+			// 	for(std::size_t i = 0; i < _silent_states_index; ++i){
+			// 		prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[i][j]);
+			// 	}
+			// 	current_bwd[j] = prob_sum;
+			// }
+			// /* Do second iteration over silent states j with i == silent state < j. Reverse topological order. */
+			// for(std::size_t j = _A.size() - 1; j >= _silent_states_index; --j){
+			// 	double prob_sum = current_bwd[j];
+			// 	for(std::size_t i = _A.size() - 1; i > j; --i){
+			// 		prob_sum = utils::sum_log_prob(prob_sum, current_bwd[i] + _A[j][i]);
+			// 	}
+			// 	current_bwd[j] = prob_sum;
+			// }
+			// return current_bwd;
+
 	}
 
 	template<typename Symbol>
