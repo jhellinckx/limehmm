@@ -421,54 +421,73 @@ public:
 	template<typename SymbolContainer>
 	std::vector<double> forward(const SymbolContainer& symbols, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = symbols.size();
-		auto init_forward = [&symbols, this]() -> std::vector<double> {
-			/* First iterate over non-silent states. */
-			std::vector<double> alpha_1(_A.size());
+		auto forward_init = [&symbols, this]() {
+			std::vector<double> alpha_0(_A.size());
+			/* First iterate over the silent states to compute the probability of
+			passing through silent states before emitting the first symbol. */
+			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+				alpha_0[i] = _pi_begin[i];
+				for(std::size_t j = _silent_states_index; j < i; ++j){
+					alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
+				}
+			}
+			/* Fill alpha_0 for non-silent states. To compute alpha_0, we need to 
+			sum the probability to directly begin at non-silent state i (pi)
+			with the probabilities to transit from all the silent states which
+			have a begin probability > 0 to non-silent state i. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_1[i] = _pi_begin[i] + (*_B[i])[0];
+				alpha_0[i] = _pi_begin[i];
+				for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+					alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
+				}
+				
+			}
+			/* We can now compute alpha_1. */
+			std::vector<double> alpha_1(_A.size());
+			/* First iterate over non-silent states. */
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				alpha_1[i] = alpha_0[i] + (*_B[i])[0];
 			}
 			/* Then silent states, in toporder. */
 			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_1[i] = _pi_begin[i];
+				alpha_1[i] = utils::kNegInf;
 				for(std::size_t j = 0; j < i; ++j){
 					alpha_1[i] = utils::sum_log_prob(alpha_1[i], _A[j][i] + alpha_1[j]);
 				}
 			}
 			return alpha_1;
 		};
-		auto iter_forward = [&symbols, this](const std::vector<double>& previous_fwd, std::size_t t) -> std::vector<double> {
-			std::vector<double> current_fwd(_A.size());
-			/* Do first normal states. */
-			for(std::size_t j = 0; j < _silent_states_index; ++j){
-				double prob_sum = utils::kNegInf;
-				for(std::size_t i = 0; i < _A.size(); ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, previous_fwd[i] + _A[i][j]);	
+		auto forward_step = [&symbols, this](const std::vector<double>& alpha_prev_t, std::size_t t) {
+			std::vector<double> alpha_t(_A.size());
+			/* Normal states. */
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				alpha_t[i] = utils::kNegInf;
+				for(std::size_t j = 0; j < _A.size(); ++j){
+					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_prev_t[j] + _A[j][i]);
 				}
-				current_fwd[j] = prob_sum + (*_B[j])[symbols[t]];
+				alpha_t[i] = alpha_t[i] + (*_B[i])[symbols[t]];
 			}
-			/* Do first iteration over silent states j with i == normal state. */
-			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-				double prob_sum = utils::kNegInf;
-				for(std::size_t i = 0; i < _silent_states_index; ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, current_fwd[i] + _A[i][j]);
+			/* Silent states. */
+			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+				alpha_t[i] = utils::kNegInf;
+				for(std::size_t j = 0; j < i; ++j){
+					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_t[j] + _A[j][i]);
 				}
-				current_fwd[j] = prob_sum;
 			}
-			/* Do second iteration over silent states j with i == silent state < j. */
-			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-				double prob_sum = current_fwd[j];
-				for(std::size_t i = _silent_states_index; i < j; ++i){
-					prob_sum = utils::sum_log_prob(prob_sum, current_fwd[i] + _A[i][j]);
-				}
-				current_fwd[j] = prob_sum;
-			}
-			return current_fwd;
+			return alpha_t;
 		};
+		auto forward_terminate = [&symbols, this](const std::vector<double>& alpha_t) {
+			if(_is_finite){
+				for(std::size_t i = 0; i < alpha_t.size(); ++i){
+					alpha_t = alpha_t + _pi_end[i];
+				}
+			}
+		}
 		
 		if(symbols.size() == 0) throw std::logic_error("forward on empty symbol list");
 		else{
 			std::vector<double> fwd = init_forward();
-			for(std::size_t t = 0; t < std::min(symbols.size(), t_max); ++t) {
+			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t) {
 				fwd = iter_forward(fwd, t);
 			}
 			return fwd;
