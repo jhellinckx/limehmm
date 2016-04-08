@@ -344,7 +344,7 @@ public:
 		/* Start by dereferencing silent states pointers to pass them to subgraph. */
 		std::vector<State> silent_states_values;
 		silent_states_values.reserve(num_silent_states);
-		std::transform(silent_states.begin(), silent_states.end(), silent_states_values.begin(), [](State* p){ return *p; });
+		for(State* p_state : silent_states) { silent_states_values.push_back(*p_state); }
 		Graph<State> subgraph = _graph.sub_graph(silent_states_values);
 		subgraph.topological_sort();
 		/* Get toposorted silent states. */
@@ -419,7 +419,6 @@ public:
 			}
 			B[states_indices[p_state->name()]] = distribution;
 		}
-
 		/* Set fields for the hmm raw values. */
 		_A = std::move(A);
 		_B = std::move(B);
