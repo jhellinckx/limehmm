@@ -715,7 +715,9 @@ public:
 					psi.add_link(max_psi, i, true);	
 				}
 			}
-			/* Fill delta_0 for non-silent states. */
+			psi.next_column();
+			std::vector<double> delta_1(_A.size(), utils::kNegInf);
+			/* Fill delta_1 for non-silent states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
 				max_delta = _pi_begin[i];
 				max_psi = _A.size();
@@ -727,16 +729,9 @@ public:
 					}
 				}
 				if(max_delta != utils::kNegInf && max_psi < _A.size()){
-					delta_0[i] = max_delta;
-					psi.add_link(max_psi, i, true);
+					delta_1[i] = max_delta + (*_B[i])[0];
+					psi.add_link(max_psi, i);
 				}
-			}
-			
-			/* We can now compute delta_1. */
-			std::vector<double> delta_1(_A.size(), utils::kNegInf);
-			/* First iterate over non-silent states. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				delta_1[i] = delta_0[i] + (*_B[i])[0];
 			}
 			/* Then silent states, in toporder. */
 			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
@@ -751,7 +746,7 @@ public:
 				}
 				if(max_delta != utils::kNegInf && max_psi < _A.size()){
 					delta_1[i] = max_delta;
-					psi.add_link(max_psi, i);
+					psi.add_link(max_psi, i, true);
 				}
 			}
 			psi.next_column();
