@@ -66,6 +66,22 @@ std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
 	return out;
 }
 
+std::ostream& operator<<(std::ostream& out, const std::vector<std::size_t>& vec){
+	for(std::size_t ul : vec){
+		out << ul << " ";
+	}
+	out << std::endl;
+	return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const std::vector<std::string>& vec){
+	for(const std::string& s : vec){
+		out << s << " ";
+	}
+	out << std::endl;
+	return out;
+}
+
 std::ostream& operator<<(std::ostream& out, const std::vector<Distribution*>& vec){
 	for(const Distribution* dist : vec){
 		if(dist == nullptr) out << "Silent" << std::endl;
@@ -565,6 +581,7 @@ public:
 			}
 			return beta_t;
 		};
+		if(t_min > 0) --t_min;
 		if(symbols.size() == 0) throw std::runtime_error("backward on empty symbol list");
 		else{
 			std::vector<double> beta = backward_init();
@@ -664,6 +681,10 @@ public:
 				}
 			}
 
+		void add(std::size_t current){
+			current_nodes[current] = NodePtr(new Node(current));
+		}
+
 		void add_link(std::size_t previous, std::size_t current, bool link_to_current = false) {
 			current_nodes[current] = (link_to_current) ?
 										NodePtr(new Node(current, current_nodes[previous])) : 
@@ -677,12 +698,28 @@ public:
 		std::vector<std::size_t> from(std::size_t k){
 			std::vector<std::size_t> traceback;
 			NodePtr node_ptr = current_nodes[k];
-			while(node_ptr->previous)	{
-				traceback.push_back(node_ptr->value);
+			traceback.push_back(node_ptr->value);
+			while(node_ptr->previous){
 				node_ptr = node_ptr->previous; 
+				traceback.push_back(node_ptr->value);
 			}
 			std::reverse(traceback.begin(), traceback.end());
 			return traceback;
+		}
+
+		std::string to_string() const {
+			std::ostringstream oss;
+			for(NodePtr p_node : current_nodes){
+				oss << p_node->value << " -> ";
+				if(p_node->previous){
+					oss << p_node->previous->value;
+				}
+				else{
+					oss << "END";
+				}
+				oss << " / ";
+			}
+			return oss.str();
 		}
 
 	};
@@ -708,9 +745,14 @@ public:
 						max_psi = j;
 					}
 				}
-				if(max_delta != utils::kNegInf && max_psi < _A.size()){
+				if(max_delta != utils::kNegInf){
 					delta_0[i] = max_delta;
+				}
+				if(max_psi < _A.size()){
 					psi.add_link(max_psi, i, true);	
+				}
+				else{
+					psi.add(i);
 				}
 			}
 			psi.next_column();
@@ -726,9 +768,14 @@ public:
 						max_psi = j;
 					}
 				}
-				if(max_delta != utils::kNegInf && max_psi < _A.size()){
+				if(max_delta != utils::kNegInf){
 					delta_1[i] = max_delta + (*_B[i])[symbols[0]];
+				}
+				if(max_psi < _A.size()){
 					psi.add_link(max_psi, i);
+				}
+				else{
+					psi.add(i);
 				}
 			}
 			/* Then silent states, in toporder. */

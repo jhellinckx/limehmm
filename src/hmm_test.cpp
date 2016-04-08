@@ -491,6 +491,7 @@ int main(){
 			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
 			std::vector<std::string> precomputed_viterbi_path_2_states({"F", "F", "F", "F", "F", "F", "F", "F"});
 			std::vector<std::string> viterbi_path_2_states = hmm.viterbi(symbols).first;
+			std::cout << "PATH : " <<viterbi_path_2_states << std::endl;
 			ASSERT(viterbi_path_2_states == precomputed_viterbi_path_2_states);
 		)
 
