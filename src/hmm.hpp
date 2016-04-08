@@ -286,7 +286,7 @@ public:
 		std::vector<State*> states = _graph.get_vertices();
 
 		/* Remove begin and end states. */
-		states.erase(std::remove(states.begin(), states.end(), [this](State* p_state){ return (*p_state) == begin() || (*p_state) == end(); }), states.end());
+		states.erase(std::remove_if(states.begin(), states.end(), [this](State* p_state){ return (*p_state) == begin() || (*p_state) == end(); }), states.end());
 		std::vector<State*> silent_states;
 		std::size_t num_states = states.size();
 
@@ -326,7 +326,8 @@ public:
 		the HMM to silent states. */
 		/* See p. 71 at http://www.upch.edu.pe/facien/fc/dbmbqf/zimic/ubioinfo/bks/Bioinformatics/Biological%20Sequence%20Analysis%20Hmm%20Bioinformatics%20(Durbin).pdf */
 		/* Start by dereferencing silent states pointers to pass them to subgraph. */
-		std::vector<State> silent_states_values(num_silent_states);
+		std::vector<State> silent_states_values;
+		silent_states_values.reserve(num_silent_states);
 		std::transform(silent_states.begin(), silent_states.end(), silent_states_values.begin(), [](State* p){ return *p; });
 		Graph<State> subgraph = _graph.sub_graph(silent_states_values);
 		subgraph.topological_sort();
@@ -341,7 +342,7 @@ public:
 		}
 
 		/* Fill transitions with log probabilities and check whether a normalization is needed. */
-		auto fill_normalize = [&states_indices, &pi_end] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill) {
+		auto fill_normalize = [this, &pi_end, &states_indices] (const std::vector<Edge<State>*>& edges, std::vector<double>& prob_vec_to_fill) {
 			std::vector<double> vec_to_normalize;
 			vec_to_normalize.reserve(edges.size());
 			double prob_sum = 0;
@@ -396,11 +397,11 @@ public:
 		std::vector<Distribution*> B(num_states);
 		for(State* p_state : states){
 			Distribution* distribution = nullptr;
-			if(! state->is_silent()) {
-				distribution = state->distribution().clone();
+			if(! p_state->is_silent()) {
+				distribution = p_state->distribution().clone();
 				distribution->log_normalize();
 			}
-			B[states_indices[state->name()]] = distribution;
+			B[states_indices[p_state->name()]] = distribution;
 		}
 
 		/* Set fields for the hmm raw values. */
@@ -478,15 +479,15 @@ public:
 		};
 		if(symbols.size() == 0) throw std::logic_error("forward on empty symbol list");
 		else{
-			std::vector<double> alpha = init_forward();
+			std::vector<double> alpha = forward_init();
 			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t) {
-				alpha = iter_forward(alpha, t);
+				alpha = forward_step(alpha, t);
 			}
 			return alpha;
 		}
 	}
 
-	std::pair<std::vector<double>, double> terminate_forward(std::vector<double>& alpha_T){
+	std::pair<std::vector<double>, double> forward_terminate(const std::vector<double>& alpha_T){
 		double log_prob = utils::kNegInf;
 		std::vector<double> alpha_end(_A.size());
 		if(_is_finite){
@@ -506,12 +507,12 @@ public:
 				alpha_end[i] = utils::kNegInf;
 			}
 		}
-		return std::make_pair(alpha_T, log_prob);
+		return std::make_pair(alpha_end, log_prob);
 	}
 
 	template<typename SymbolContainer>
 	std::vector<double> backward(const SymbolContainer& symbols, std::size_t t_min = 0) {
-		auto init_backward = [this]() {
+		auto backward_init = [this]() {
 			std::vector<double> beta_T(_A.size());
 			if(_is_finite){
 				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
@@ -522,8 +523,8 @@ public:
 				}
 				for(std::size_t i = 0; i < _silent_states_index; ++i){
 					beta_T[i] = _pi_end[i];
-					for(std::size_t j = silent_states_index; j < _A.size(); ++j){
-						beta_T[i] = utls::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]); 
+					for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+						beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]); 
 					}
 				}
 			}
@@ -540,14 +541,14 @@ public:
 		auto backward_step = [&symbols, this](const std::vector<double>& beta_next_t, std::size_t t) -> std::vector<double> {
 			std::vector<double> beta_t(_A.size());
 			/* First pass over silent states, considering next step non-silent states. */
-			for(std::size_t i = A.size() - 1; i >= _silent_states_index; --i){
+			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 				beta_t[i] = utils::kNegInf;
 				for(std::size_t j = 0; j < _silent_states_index; j++){
 					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[symbols[t + 1]]);
 				}
 			}
 			/* Second pass over silent states, considering current step silent states. */
-			for(std::size_t i = A.size() - 1; i >= _silent_states_index; --i){
+			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 				for(std::size_t j = _silent_states_index; j < _A.size(); j++){
 					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
 				}
@@ -566,48 +567,49 @@ public:
 		};
 		if(symbols.size() == 0) throw std::runtime_error("backward on empty symbol list");
 		else{
-			std::vector<double> beta = init_backward();
+			std::vector<double> beta = backward_init();
 			for(std::size_t t = symbols.size() - 2; t >= t_min && t < symbols.size(); --t){
-				beta = iter_backward(beta, t);
+				beta = backward_step(beta, t);
 			}
 			return beta;
 		}
 	}
 
-	std::pair<std::vector<double>, double> terminate_backward(const std::vector<double>& beta_0){
+	template<typename SymbolContainer>
+	std::pair<std::vector<double>, double> backward_terminate(const std::vector<double>& beta_0, SymbolContainer& symbols){
 		std::vector<double> beta_end(_A.size());
-		/* First pass over silent states, considering next step non-silent states. */
-			for(std::size_t i = A.size() - 1; i >= _silent_states_index; --i){
+			/* First pass over silent states, considering next step non-silent states. */
+			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 				beta_end[i] = utils::kNegInf;
 				for(std::size_t j = 0; j < _silent_states_index; j++){
 					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_0[j] + _A[i][j] + (*_B[j])[symbols[0]]);
 				}
 			}
 			/* Second pass over silent states, considering current step silent states. */
-			for(std::size_t i = A.size() - 1; i >= _silent_states_index; --i){
+			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 				for(std::size_t j = _silent_states_index; j < _A.size(); j++){
-					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_t[j] + _A[i][j]);
+					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
 				}
 			}
 			double log_prob = utils::kNegInf;
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				beta_end[i] = _pi_begin[i] + (*_B[i])[symbols[0]]) + beta_0[i];
+				beta_end[i] = _pi_begin[i] + (*_B[i])[symbols[0]] + beta_0[i];
 				log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
 			}
 			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
 				beta_end[i] = _pi_begin[i] +  beta_end[i];
 				log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
 			}
-			return std::make_pair(beta_end[i], log_prob);
+			return std::make_pair(beta_end, log_prob);
 	}
 
-	template<typename Symbol>
-	double log_likelihood(const std::vector<Symbol>& symbols, bool do_fwd = true){
+	template<typename SymbolContainer>
+	double log_likelihood(const SymbolContainer& symbols, bool do_fwd = true){
 		if(do_fwd){
-			return terminate_forward(forward(symbols)).second
+			return forward_terminate(forward(symbols)).second;
 		}
 		else{
-			return terminate_backward(backward(symbols)).second
+			return backward_terminate(backward(symbols), symbols).second;
 		}
 			// std::vector<double> bwd = backward(symbols);
 			// /* Normal states first. */
@@ -634,8 +636,8 @@ public:
 
 	}
 
-	template<typename Symbol>
-	double likelihood(const std::vector<Symbol>& symbols, bool do_fwd = true){
+	template<typename SymbolContainer>
+	double likelihood(const SymbolContainer& symbols, bool do_fwd = true){
 		return exp(log_likelihood(symbols, do_fwd));
 	}
 
@@ -686,7 +688,7 @@ public:
 	};
 
 	template<typename SymbolContainer>
-	std::vector<double> viterbi(const SymbolContainer& symbols, std::size_t t_max = 0) {
+	std::pair<std::vector<std::string>, double> viterbi(const SymbolContainer& symbols, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = symbols.size();
 		auto viterbi_init = [&symbols, this]() {
 			std::vector<double> delta_0(_A.size(), utils::kNegInf);
@@ -790,7 +792,7 @@ public:
 		};
 		if(symbols.size() == 0) throw std::logic_error("viterbi on empty symbol list");
 		else{
-			std::pair<vector<double>, Traceback> delta_tb = viterbi_init();
+			std::pair<std::vector<double>, Traceback> delta_tb = viterbi_init();
 			std::vector<double>& delta = delta_tb.first;
 			Traceback& traceback = delta_tb.second;
 			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t) {
@@ -807,8 +809,8 @@ public:
 			/* Add end transitions.*/
 			for(std::size_t i = 0; i < _A.size(); ++i){
 				delta_T[i] = delta_T[i] + _pi_end[i];
-				if(delta_T[i] > max_delta_t){
-					max_delta_t = delta_T[i];
+				if(delta_T[i] > max_delta_T){
+					max_delta_T = delta_T[i];
 					max_state_index = i;
 				}
 			}
@@ -816,8 +818,8 @@ public:
 		else{
 			/* Only consider normal states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				if(delta_T[i] > max_delta_t){
-					max_delta_t = delta_T[i];
+				if(delta_T[i] > max_delta_T){
+					max_delta_T = delta_T[i];
 					max_state_index = i;
 				}
 			}
