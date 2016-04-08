@@ -662,8 +662,10 @@ public:
 				}
 			}
 
-		void add_link(std::size_t previous, std::size_t current) {
-			current_nodes[current] = NodePtr(new Node(current, previous_nodes[previous]));
+		void add_link(std::size_t previous, std::size_t current, bool link_to_current = false) {
+			current_nodes[current] = (link_to_current) ?
+										NodePtr(new Node(current, current_nodes[previous])) : 
+										NodePtr(new Node(current, previous_nodes[previous]));
 		}
 
 		void next_column() {
@@ -691,7 +693,7 @@ public:
 	std::vector<double> viterbi(const SymbolContainer& symbols, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = symbols.size();
 		auto viterbi_init = [&symbols, this]() {
-			std::vector<double> delta_0(_A.size());
+			std::vector<double> delta_0(_A.size(), utils::kNegInf);
 			Traceback psi(_A.size());
 			/* First iterate over the silent states to compute the max probability of
 			passing through silent states before emitting the first symbol. */
@@ -710,13 +712,10 @@ public:
 				}
 				if(max_delta != utils::kNegInf && max_psi < _A.size()){
 					delta_0[i] = max_delta;
-					psi.add_link(max_psi, i);	
+					psi.add_link(max_psi, i, true);	
 				}
 			}
-			/* Fill delta_0 for non-silent states. To compute delta_0, we need to 
-			sum the probability to directly begin at non-silent state i (pi)
-			with the probabilities to transit from all the silent states which
-			have a begin probability > 0 to non-silent state i. */
+			/* Fill delta_0 for non-silent states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
 				max_delta = _pi_begin[i];
 				max_psi = _A.size();
@@ -729,12 +728,12 @@ public:
 				}
 				if(max_delta != utils::kNegInf && max_psi < _A.size()){
 					delta_0[i] = max_delta;
-					psi.add_link(max_psi, i);
+					psi.add_link(max_psi, i, true);
 				}
-				
 			}
+			
 			/* We can now compute delta_1. */
-			std::vector<double> delta_1(_A.size());
+			std::vector<double> delta_1(_A.size(), utils::kNegInf);
 			/* First iterate over non-silent states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
 				delta_1[i] = delta_0[i] + (*_B[i])[0];
@@ -756,26 +755,46 @@ public:
 				}
 			}
 			psi.next_column();
-			return delta_1;
+			return std::make_pair(delta_1, psi);
 		};
-		auto viterbi_step = [&symbols, this](const std::vector<double>& alpha_prev_t, std::size_t t) {
-			std::vector<double> alpha_t(_A.size());
+		auto viterbi_step = [&symbols, this](const std::vector<double>& delta_prev_t, const Traceback& psi, std::size_t t) {
+			std::vector<double> delta_t(_A.size(), utils::kNegInf);
 			/* Normal states. */
+			double max_delta;
+			double current_delta;
+			std::size_t max_psi;
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_t[i] = utils::kNegInf;
+				max_delta = utils::kNegInf;
+				max_psi = _A.size();
 				for(std::size_t j = 0; j < _A.size(); ++j){
-					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_prev_t[j] + _A[j][i]);
+					current_delta = delta_prev_t[j] + _A[j][i];
+					if(current_delta > max_delta){
+						max_delta = current_delta;
+						max_psi = j;
+					}
 				}
-				alpha_t[i] = alpha_t[i] + (*_B[i])[symbols[t]];
+				if(max_delta != utils::kNegInf && max_psi != _A.size()){
+					delta_t[i] = max_delta + (*_B[i])[symbols[t]];
+					psi.add_link(max_psi, i);
+				}
 			}
 			/* Silent states. */
 			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_t[i] = utils::kNegInf;
+				max_delta = utils::kNegInf;
+				max_psi = _A.size();
 				for(std::size_t j = 0; j < i; ++j){
-					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_t[j] + _A[j][i]);
+					current_delta = delta_t[j] + _A[j][i];
+					if(current_delta > max_delta){
+						max_delta = current_delta;
+						max_psi = j;
+					}
+				}
+				if(max_delta != utils::kNegInf && max_psi != _A.size()){
+					delta_t[i] = max_delta;
+					psi.add_link(max_psi, i);
 				}
 			}
-			return alpha_t;
+			return delta_t;
 		};
 		if(symbols.size() == 0) throw std::logic_error("forward on empty symbol list");
 		else{
