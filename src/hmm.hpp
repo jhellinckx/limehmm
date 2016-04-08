@@ -486,7 +486,7 @@ public:
 		}
 	}
 
-	std::pair<std::vector<double>, double> terminate_forward(std::vector<double> alpha_T){
+	std::pair<std::vector<double>, double> terminate_forward(std::vector<double>& alpha_T){
 		double log_prob = utils::kNegInf;
 		std::vector<double> alpha_end(_A.size());
 		if(_is_finite){
@@ -672,19 +672,15 @@ public:
 			previous_nodes = current_nodes;
 		}
 
-		std::vector<std::size_t> trace_back(std::size_t previous, std::size_t max_k){
-			std::size_t k = max_k;
-			std::vector<std::size_t> tb(k);
-			NodePtr node_ptr = previous_nodes[previous];
-			while(k > 0){
-				tb[k - 1] = node_ptr->value;
-				if(!node_ptr->previous) break;
+		std::vector<std::size_t> from(std::size_t k){
+			std::vector<std::size_t> traceback;
+			NodePtr node_ptr = current_nodes[k];
+			while(node_ptr->previous)	{
+				traceback.push_back(node_ptr->value);
 				node_ptr = node_ptr->previous; 
-				--k;
 			}
-			if(k > 0) throw std::logic_error("Could not trace back to " + std::to_string(max_k) + ". Stopped at " + std::to_string(k));
-			if(node_ptr->previous) throw std::logic_error("Traceback not completed. Previous value: " + std::to_string(node_ptr->previous->value));
-			return tb;
+			std::reverse(traceback.begin(), traceback.end());
+			return traceback;
 		}
 
 	};
@@ -752,7 +748,7 @@ public:
 			psi.next_column();
 			return std::make_pair(delta_1, psi);
 		};
-		auto viterbi_step = [&symbols, this](const std::vector<double>& delta_prev_t, const Traceback& psi, std::size_t t) {
+		auto viterbi_step = [&symbols, this](const std::vector<double>& delta_prev_t, Traceback& psi, std::size_t t) {
 			std::vector<double> delta_t(_A.size(), utils::kNegInf);
 			/* Normal states. */
 			double max_delta;
@@ -786,42 +782,59 @@ public:
 				}
 				if(max_delta != utils::kNegInf && max_psi != _A.size()){
 					delta_t[i] = max_delta;
-					psi.add_link(max_psi, i);
+					psi.add_link(max_psi, i, true);
 				}
 			}
+			psi.next_column();
 			return delta_t;
 		};
-		if(symbols.size() == 0) throw std::logic_error("forward on empty symbol list");
+		if(symbols.size() == 0) throw std::logic_error("viterbi on empty symbol list");
 		else{
-			std::vector<double> alpha = init_forward();
+			std::pair<vector<double>, Traceback> delta_tb = viterbi_init();
+			std::vector<double>& delta = delta_tb.first;
+			Traceback& traceback = delta_tb.second;
 			for(std::size_t t = 1; t < std::min(symbols.size(), t_max); ++t) {
-				alpha = iter_forward(alpha, t);
+				delta = viterbi_step(delta, traceback, t);
 			}
-			return alpha;
+			return terminate_viterbi(delta, traceback);
 		}
 	}
 
-	std::pair<std::vector<double>, double> terminate_viterbi(std::vector<double> alpha_T){
-		double log_prob = utils::kNegInf;
-		std::vector<double> alpha_end(_A.size());
+	std::pair<std::vector<std::string>, double> terminate_viterbi(std::vector<double>& delta_T, Traceback& traceback){
+		double max_delta_T = utils::kNegInf;
+		std::size_t max_state_index = _A.size();
 		if(_is_finite){
-			/* Sum all and add end transitions. */
-			for(std::size_t i = 0; i < alpha_T.size(); ++i){
-				alpha_end[i] = alpha_T[i] + _pi_end[i];
-				log_prob = utils::sum_log_prob(log_prob, alpha_end[i]);
+			/* Add end transitions.*/
+			for(std::size_t i = 0; i < _A.size(); ++i){
+				delta_T[i] = delta_T[i] + _pi_end[i];
+				if(delta_T[i] > max_delta_t){
+					max_delta_t = delta_T[i];
+					max_state_index = i;
+				}
 			}
 		}
 		else{
-			/* Non finite hmm end in non-silent states. */
+			/* Only consider normal states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_end[i] = alpha_T[i];
-				log_prob = utils::sum_log_prob(log_prob, alpha_end[i]);
-			}
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_end[i] = utils::kNegInf;
+				if(delta_T[i] > max_delta_t){
+					max_delta_t = delta_T[i];
+					max_state_index = i;
+				}
 			}
 		}
-		return std::make_pair(alpha_T, log_prob);
+		if(max_delta_T != utils::kNegInf && max_state_index < _A.size()){
+			std::vector<std::size_t> path_indices = traceback.from(max_state_index);
+			std::vector<std::string> path;
+			path.reserve(path_indices.size());
+			for(std::size_t path_index : path_indices){
+				path.push_back(_states_names[path_index]);
+			}
+			return std::make_pair(path, max_delta_T);
+		}
+		else{
+			/* Symbols sequence is impossible. */
+			return std::make_pair(std::vector<std::string>(), utils::kNegInf);
+		}
 	}
 
 	template<typename Symbol>
