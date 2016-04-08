@@ -447,7 +447,7 @@ public:
 			std::vector<double> alpha_1(_A.size());
 			/* First iterate over non-silent states. */
 			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_1[i] = alpha_0[i] + (*_B[i])[0];
+				alpha_1[i] = alpha_0[i] + (*_B[i])[symbols[0]];
 			}
 			/* Then silent states, in toporder. */
 			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
@@ -727,7 +727,7 @@ public:
 					}
 				}
 				if(max_delta != utils::kNegInf && max_psi < _A.size()){
-					delta_1[i] = max_delta + (*_B[i])[0];
+					delta_1[i] = max_delta + (*_B[i])[symbols[0]];
 					psi.add_link(max_psi, i);
 				}
 			}

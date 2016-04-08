@@ -49,7 +49,7 @@ public:
 	}
 	virtual void log_normalize() = 0;
 	virtual double& operator[] (const std::string&) = 0;
-	virtual double& operator[] (const double&) = 0;
+	virtual double& operator[] (double) = 0;
 	virtual bool operator==(const Distribution& other) const = 0;
 	virtual bool operator!=(const Distribution& other) const = 0;
 	/* For polymorphic use */
@@ -165,7 +165,7 @@ public:
 		return _distribution[symbol];
 	}
 
-	virtual double& operator[] (const double& symbol) {
+	virtual double& operator[] (double symbol) {
 		std::cout<<"call double"<<std::endl;
 		return operator[](std::to_string(symbol));
 	}
