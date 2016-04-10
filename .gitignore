@@ -16,10 +16,14 @@
 # Ignore objects files
 .o
 
-* Ignore exec file
+# Ignore exec file
 main
 test
 hmm_test
+*.dSYM
+
+test.cpp
+test_ogdf.cpp
 
 # Ignore graphviz files
 *.dot

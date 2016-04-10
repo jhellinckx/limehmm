@@ -436,19 +436,58 @@ public:
 	/* Graph interface */
 	Graph() : _vertices(), _edges() {}
 
-	Graph(const Graph<VertexElementBase>& other) : _vertices(), _edges() {
-		_vertices.reserve(other._vertices.size());
-		for(std::size_t i = 0; i < other._vertices.size(); ++i){
-			_vertices[i] = new VertexElementBase(*(other._vertices[i]));
-		}
-		_edges.reserve(other._edges.size());
-		for(std::size_t i = 0; i < other._edges.size(); ++i){
-			_edges[i] = new Edge<VertexElementBase>(*(other._edges[i]));
-		}
+	Graph(const Graph<VertexElementBase>& other) : 
+		_vertices(other._vertices.size()), _edges(other._edges.size()) {
+			for(std::size_t i = 0; i < other._vertices.size(); ++i){
+				_vertices[i] = new VertexElementBase(*(other._vertices[i]));
+			}
+			for(std::size_t i = 0; i < other._edges.size(); ++i){
+				_edges[i] = (other._edges[i]->weight() != nullptr) ? 
+				new Edge<VertexElementBase>(
+					**_find_vertex(*(other._edges[i]->from())),
+					**_find_vertex(*(other._edges[i]->to())),
+					*(other._edges[i]->weight())) : 
+				new Edge<VertexElementBase>(
+					**_find_vertex(*(other._edges[i]->from())), 
+					**_find_vertex(*(other._edges[i]->to())));
+			}
 	}
 
 	Graph(Graph<VertexElementBase>&& other) :
 		_vertices(std::move(other._vertices)), _edges(std::move(other._edges)) {}
+
+	Graph<VertexElementBase>& operator=(const Graph<VertexElementBase>& other){
+		if(this != &other){
+			_clear_all_edges();
+			_clear_all_vertices();
+			_vertices.resize(other._vertices.size());
+			for(std::size_t i = 0; i < other._vertices.size(); ++i){
+				_vertices[i] = new VertexElementBase(*(other._vertices[i]));
+			}
+			_edges.resize(other._edges.size());
+			for(std::size_t i = 0; i < other._edges.size(); ++i){
+				_edges[i] = (other._edges[i]->weight() != nullptr) ? 
+				new Edge<VertexElementBase>(
+					**_find_vertex(*(other._edges[i]->from())), 
+					**_find_vertex(*(other._edges[i]->to())),
+					*(other._edges[i]->weight())) : 
+				new Edge<VertexElementBase>(
+					**_find_vertex(*(other._edges[i]->from())), 
+					**_find_vertex(*(other._edges[i]->to())));
+			}
+		}
+		return *this;
+	}
+
+	Graph<VertexElementBase>& operator=(Graph<VertexElementBase>&& other){
+		if(this != &other){
+			_clear_all_edges();
+			_clear_all_vertices();
+			_vertices = std::move(other._vertices);
+			_edges = std::move(other._edges);
+		}
+		return *this;
+	}
 
 	std::size_t num_vertices() const { return _vertices.size(); }
 	std::size_t num_edges() const { return _edges.size(); }

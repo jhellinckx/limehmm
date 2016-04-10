@@ -18,7 +18,7 @@
 #define ASSERT_ABORT(expr, msg) assert(expr, #expr, __FILE__, __LINE__, msg, true)
 #define ASSERT_EXCEPT(instruction, except_type) assert_except<except_type>([&](){instruction;}, #instruction, #except_type, __FILE__, __LINE__)
 
-#define TEST_UNIT(name, instructions) run_unit_test(name, [](){instructions});
+#define TEST_UNIT(name, instructions) run_unit_test(name, [&](){instructions});
 
 #define VERBOSE 1
 #define BIG_SEPARATOR std::string(60, '=')
@@ -100,6 +100,141 @@ void tests_results(){
 
 int main(){
 	try{
+		/* Create hmm examples. */
+
+		/* Simple fair/biased model. */
+		HiddenMarkovModel casino_hmm("casino");
+		DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
+		DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
+		State fair = State("fair", fair_dist);
+		State biased = State("biased", biased_dist);
+		casino_hmm.add_state(fair);
+		casino_hmm.add_transition(casino_hmm.begin(), fair, 0.5);
+		casino_hmm.add_state(biased);
+		casino_hmm.add_transition(casino_hmm.begin(), biased, 0.5);
+		casino_hmm.add_transition(fair, fair, 0.9);
+		casino_hmm.add_transition(fair, biased, 0.1);
+		casino_hmm.add_transition(biased, biased, 0.9);
+		casino_hmm.add_transition(biased, fair, 0.1);
+		casino_hmm.brew();
+		/* Precomputed casino values. */
+		std::vector<std::string> casino_symbols({"T","H","H","T","T","T","H","H"});
+		double casino_precomputed_init_fwd_fair = 0.25;
+		double casino_precomputed_init_fwd_biased = 0.125;
+		double casino_precomputed_mid_fwd_fair = 0.0303;
+		double casino_precomputed_mid_fwd_biased = 0.0191;
+		double casino_precomputed_end_fwd_fair = 0.0015;
+		double casino_precomputed_end_fwd_biased = 0.0013;
+		double casino_precomputed_init_bwd_fair = 1;
+		double casino_precomputed_init_bwd_biased = 1;
+		double casino_precomputed_mid_bwd_fair = 0.0679;
+		double casino_precomputed_mid_bwd_biased = 0.0366;
+		double casino_precomputed_end_bwd_fair = 0.0075;
+		double casino_precomputed_end_bwd_biased = 0.0071;
+		double casino_precomputed_likelihood = 0.0028;
+		std::vector<std::string> casino_precomputed_viterbi_path_2_states({"fair", "fair", "fair", "fair", "fair", "fair", "fair", "fair"});
+
+		/* Simple hmm with 3 states emitting nucleobases. Not normalized. */
+		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
+		DiscreteDistribution dist1({{"A", 0.35}, {"C", 0.20}, {"G", 0.05}, {"T", 40}});
+		DiscreteDistribution dist2({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 25}});
+		DiscreteDistribution dist3({{"A", 0.10}, {"C", 0.40}, {"G", 0.40}, {"T", 10}});
+		State s1("s1", dist1);
+		State s2("s2", dist2);
+		State s3("s3", dist3);
+		nucleobase_3_states_hmm.add_state(s1);
+		nucleobase_3_states_hmm.add_state(s2);
+		nucleobase_3_states_hmm.add_state(s3);
+		nucleobase_3_states_hmm.begin_transition(s1, 0.90);
+		nucleobase_3_states_hmm.begin_transition(s2, 0.10);
+		nucleobase_3_states_hmm.add_transition(s1, s1, 0.80);
+		nucleobase_3_states_hmm.add_transition(s1, s2, 0.20);
+		nucleobase_3_states_hmm.add_transition(s2, s2, 0.90);
+		nucleobase_3_states_hmm.add_transition(s2, s3, 0.10);
+		nucleobase_3_states_hmm.add_transition(s3, s3, 0.70);
+		nucleobase_3_states_hmm.end_transition(s3, 0.30);
+		/* Don't normalize. */
+		nucleobase_3_states_hmm.brew(false); 
+		/* Precomputed values. */
+		std::vector<std::string> nucleobase_symbols({"A", "C", "G", "A", "C", "T", "A", "T", "T", "C", "G", "A", "T"});
+		double nucleobase_precomputed_log_likelihood = utils::round_double(-4.31828085576, 6);
+		std::vector<std::string> nucleobase_precomputed_viterbi_path_3_states({"s1", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s3"});
+		
+		/* Profile hmm with 10 states. */
+		HiddenMarkovModel profile_10_states_hmm("profile 10 states");
+		DiscreteDistribution i_d({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
+		/* Create insert states. */
+		State i0 = State("I0", i_d);
+		State i1 = State("I1", i_d);
+		State i2 = State("I2", i_d);
+		State i3 = State("I3", i_d);
+		/* Create match states. */
+		State m1 = State("M1", DiscreteDistribution({{"A", 0.95},  {"C", 0.01}, {"G", 0.01},  {"T", 0.02 }}));
+		State m2 = State("M2", DiscreteDistribution({{"A", 0.003}, {"C", 0.99}, {"G", 0.003}, {"T", 0.004}}));
+		State m3 = State("M3", DiscreteDistribution({{"A", 0.01},  {"C", 0.01}, {"G", 0.01},  {"T", 0.97 }}));
+		/* Create delete states. */
+		State d1 = State("D1");
+		State d2 = State("D2");
+		State d3 = State("D3");
+		/* Add all the states. */
+		profile_10_states_hmm.add_state(i0);
+		profile_10_states_hmm.add_state(i1);
+		profile_10_states_hmm.add_state(i2);
+		profile_10_states_hmm.add_state(i3);
+		profile_10_states_hmm.add_state(m1);
+		profile_10_states_hmm.add_state(m2);
+		profile_10_states_hmm.add_state(m3);
+		profile_10_states_hmm.add_state(d1);
+		profile_10_states_hmm.add_state(d2);
+		profile_10_states_hmm.add_state(d3);
+		/* Transitions from match states. */
+		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), m1, 0.9);
+		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), i0, 0.1);
+		profile_10_states_hmm.add_transition(m1, m2, 0.9);
+		profile_10_states_hmm.add_transition(m1, i1, 0.05);
+		profile_10_states_hmm.add_transition(m1, d2, 0.05);
+		profile_10_states_hmm.add_transition(m2, m3, 0.9);
+		profile_10_states_hmm.add_transition(m2, i2, 0.05);
+		profile_10_states_hmm.add_transition(m2, d3, 0.05);
+		profile_10_states_hmm.add_transition(m3, profile_10_states_hmm.end(), 0.9);
+		profile_10_states_hmm.add_transition(m3, i3, 0.1);
+		/* Transitions from insert states. */
+		profile_10_states_hmm.add_transition(i0, i0, 0.70);
+		profile_10_states_hmm.add_transition(i0, d1, 0.15);
+		profile_10_states_hmm.add_transition(i0, m1, 0.15);
+		profile_10_states_hmm.add_transition(i1, i1, 0.70);
+		profile_10_states_hmm.add_transition(i1, d2, 0.15);
+		profile_10_states_hmm.add_transition(i1, m2, 0.15);
+		profile_10_states_hmm.add_transition(i2, i2, 0.70);
+		profile_10_states_hmm.add_transition(i2, d3, 0.15);
+		profile_10_states_hmm.add_transition(i2, m3, 0.15);
+		profile_10_states_hmm.add_transition(i3, i3, 0.85);
+		profile_10_states_hmm.add_transition(i3, profile_10_states_hmm.end(), 0.15);
+		/* Transitions from delete states. */
+		profile_10_states_hmm.add_transition(d1, d2, 0.15);
+		profile_10_states_hmm.add_transition(d1, i1, 0.15);
+		profile_10_states_hmm.add_transition(d1, m2, 0.70);
+		profile_10_states_hmm.add_transition(d2, d3, 0.15);
+		profile_10_states_hmm.add_transition(d2, i2, 0.15);
+		profile_10_states_hmm.add_transition(d2, m3, 0.70);
+		profile_10_states_hmm.add_transition(d3, i3, 0.30);
+		profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
+		profile_10_states_hmm.brew(false);
+		/* Precomputed values. */
+		std::vector<std::vector<std::string>> profile_sequences(4);
+		profile_sequences[0] = std::vector<std::string>({{"A","C","T"}});
+		profile_sequences[1] = std::vector<std::string>({{"G","G","C"}});
+		profile_sequences[2] = std::vector<std::string>({{"G","A","T"}});
+		profile_sequences[3] = std::vector<std::string>({{"A","C","C"}});
+		double profile_seq1_viterbi_log_likelihood_precomputed = utils::round_double(-0.513244900357, 6);
+		double profile_seq2_viterbi_log_likelihood_precomputed = utils::round_double(-11.0481012413, 6);
+		double profile_seq3_viterbi_log_likelihood_precomputed = utils::round_double(-9.12551967402, 6);
+		double profile_seq4_viterbi_log_likelihood_precomputed = utils::round_double(-5.08795587886, 6);
+		std::vector<std::string> profile_seq1_viterbi_path_precomputed({"M1", "M2", "M3"});
+		std::vector<std::string> profile_seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
+		std::vector<std::string> profile_seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
+		std::vector<std::string> profile_seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
+
 
 		tests_init();
 		
@@ -355,249 +490,127 @@ int main(){
 
 		TEST_UNIT(
 			"forward",
-			/* Create a simple fair-biased model. */
-			HiddenMarkovModel hmm;
-			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
-			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
-			State fair = State("fair", fair_dist);
-			State biased = State("biased", biased_dist);
-			hmm.add_state(fair);
-			hmm.add_transition(hmm.begin(), fair, 0.5);
-			hmm.add_state(biased);
-			hmm.add_transition(hmm.begin(), biased, 0.5);
-			hmm.add_transition(fair, fair, 0.9);
-			hmm.add_transition(fair, biased, 0.1);
-			hmm.add_transition(biased, biased, 0.9);
-			hmm.add_transition(biased, fair, 0.1);
-			hmm.brew();
-			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			HiddenMarkovModel hmm = casino_hmm;
+			std::vector<std::string> symbols = casino_symbols;
 			/* Test init forward aka t = 1 aka first forward column. */
-			double precomputed_init_fwd_fair = 0.25;
-			double precomputed_init_fwd_biased = 0.125;
 			/* Second parameter gives t. */
 			std::vector<double> init_fwd = hmm.forward(symbols, 1);
 			ASSERT(init_fwd.size() == 2);
 			double init_fwd_fair = utils::round_double(exp(init_fwd[hmm.states_indices()["fair"]]), 2);
 			double init_fwd_biased = utils::round_double(exp(init_fwd[hmm.states_indices()["biased"]]), 3);
-			ASSERT(init_fwd_fair == precomputed_init_fwd_fair);
-			ASSERT(init_fwd_biased == precomputed_init_fwd_biased);
+			ASSERT(init_fwd_fair == casino_precomputed_init_fwd_fair);
+			ASSERT(init_fwd_biased == casino_precomputed_init_fwd_biased);
 			/* Test middle column. */
-			double precomputed_mid_fwd_fair = 0.0303;
-			double precomputed_mid_fwd_biased = 0.0191;
 			std::vector<double> mid_fwd = hmm.forward(symbols, 4);
 			double mid_fwd_fair = utils::round_double(exp(mid_fwd[hmm.states_indices()["fair"]]), 4);
 			double mid_fwd_biased = utils::round_double(exp(mid_fwd[hmm.states_indices()["biased"]]), 4);
-			ASSERT(mid_fwd_fair == precomputed_mid_fwd_fair);
-			ASSERT(mid_fwd_biased == precomputed_mid_fwd_biased);
+			ASSERT(mid_fwd_fair == casino_precomputed_mid_fwd_fair);
+			ASSERT(mid_fwd_biased == casino_precomputed_mid_fwd_biased);
 			/* Test last fwd column. */
-			double precomputed_end_fwd_fair = 0.0015;
-			double precomputed_end_fwd_biased = 0.0013;
 			/* T not given, iterate on all the symbols. */
 			std::vector<double> fwd_end = hmm.forward(symbols);
 			double end_fwd_fair = utils::round_double(exp(fwd_end[hmm.states_indices()["fair"]]), 4);
 			double end_fwd_biased = utils::round_double(exp(fwd_end[hmm.states_indices()["biased"]]), 4);
-			ASSERT(end_fwd_fair == precomputed_end_fwd_fair);
-			ASSERT(end_fwd_biased == precomputed_end_fwd_biased);
+			ASSERT(end_fwd_fair == casino_precomputed_end_fwd_fair);
+			ASSERT(end_fwd_biased == casino_precomputed_end_fwd_biased);
 		)
 
 		TEST_UNIT(
 			"backward",
 			/* Same model as forward test. */
-			HiddenMarkovModel hmm;
-			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
-			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
-			State fair = State("fair", fair_dist);
-			State biased = State("biased", biased_dist);
-			hmm.add_state(fair);
-			hmm.add_transition(hmm.begin(), fair, 0.5);
-			hmm.add_state(biased);
-			hmm.add_transition(hmm.begin(), biased, 0.5);
-			hmm.add_transition(fair, fair, 0.9);
-			hmm.add_transition(fair, biased, 0.1);
-			hmm.add_transition(biased, biased, 0.9);
-			hmm.add_transition(biased, fair, 0.1);
-			hmm.brew();
-			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
+			HiddenMarkovModel hmm = casino_hmm;
+			std::vector<std::string> symbols = casino_symbols;
 			/* Test init backward. */
-			double precomputed_init_bwd_fair = 1;
-			double precomputed_init_bwd_biased = 1;
 			std::vector<double> init_bwd = hmm.backward(symbols, symbols.size());
 			ASSERT(init_bwd.size() == 2);
 			double init_bwd_fair = utils::round_double(exp(init_bwd[hmm.states_indices()["fair"]]), 3);
 			double init_bwd_biased = utils::round_double(exp(init_bwd[hmm.states_indices()["biased"]]), 3);
-			ASSERT(init_bwd_fair == precomputed_init_bwd_fair);
-			ASSERT(init_bwd_biased == precomputed_init_bwd_biased);
+			ASSERT(init_bwd_fair == casino_precomputed_init_bwd_fair);
+			ASSERT(init_bwd_biased == casino_precomputed_init_bwd_biased);
 			/* Test middle column. */
-			double precomputed_mid_bwd_fair = 0.0679;
-			double precomputed_mid_bwd_biased = 0.0366;
 			std::vector<double> mid_bwd = hmm.backward(symbols, 4);
 			double mid_bwd_fair = utils::round_double(exp(mid_bwd[hmm.states_indices()["fair"]]), 4);
 			double mid_bwd_biased = utils::round_double(exp(mid_bwd[hmm.states_indices()["biased"]]), 4);
-			ASSERT(mid_bwd_fair == precomputed_mid_bwd_fair);
-			ASSERT(mid_bwd_biased == precomputed_mid_bwd_biased);
+			ASSERT(mid_bwd_fair == casino_precomputed_mid_bwd_fair);
+			ASSERT(mid_bwd_biased == casino_precomputed_mid_bwd_biased);
 			/* Test last backward column. */
-			double precomputed_end_bwd_fair = 0.0075;
-			double precomputed_end_bwd_biased = 0.0071;
 			std::vector<double> bwd_end = hmm.backward(symbols);
 			double end_bwd_fair = utils::round_double(exp(bwd_end[hmm.states_indices()["fair"]]), 4);
 			double end_bwd_biased = utils::round_double(exp(bwd_end[hmm.states_indices()["biased"]]), 4);
-			ASSERT(end_bwd_fair == precomputed_end_bwd_fair);
-			ASSERT(end_bwd_biased == precomputed_end_bwd_biased);
+			ASSERT(end_bwd_fair == casino_precomputed_end_bwd_fair);
+			ASSERT(end_bwd_biased == casino_precomputed_end_bwd_biased);
 		)
 
 		TEST_UNIT(
 			"likelihood",
 			/* Same model as fwd/bwd. */
-			HiddenMarkovModel hmm;
-			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
-			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
-			State fair = State("fair", fair_dist);
-			State biased = State("biased", biased_dist);
-			hmm.add_state(fair);
-			hmm.add_transition(hmm.begin(), fair, 0.5);
-			hmm.add_state(biased);
-			hmm.add_transition(hmm.begin(), biased, 0.5);
-			hmm.add_transition(fair, fair, 0.9);
-			hmm.add_transition(fair, biased, 0.1);
-			hmm.add_transition(biased, biased, 0.9);
-			hmm.add_transition(biased, fair, 0.1);
-			hmm.brew();
-			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
-			double precomputed_likelihood = 0.0028;
+			HiddenMarkovModel hmm = casino_hmm;
 			/* Test likelihood with forward algorithm. */
-			double forward_likelihood = utils::round_double(hmm.likelihood(symbols), 4);
-			ASSERT(forward_likelihood == precomputed_likelihood);
+			double forward_likelihood = utils::round_double(hmm.likelihood(casino_symbols), 4);
+			ASSERT(forward_likelihood == casino_precomputed_likelihood);
 			/* Test likelihood with backward algorithm. */
-			double backward_likelihood = utils::round_double(hmm.likelihood(symbols, false), 4);
-			ASSERT(backward_likelihood == precomputed_likelihood);
+			double backward_likelihood = utils::round_double(hmm.likelihood(casino_symbols, false), 4);
+			ASSERT(backward_likelihood == casino_precomputed_likelihood);
 		)
 
 		TEST_UNIT(
-			"viterbi decode (2 states)",
-			HiddenMarkovModel hmm;
-			DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
-			DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
-			State fair = State("F", fair_dist);
-			State biased = State("B", biased_dist);
-			hmm.add_state(fair);
-			hmm.add_transition(hmm.begin(), fair, 0.5);
-			hmm.add_state(biased);
-			hmm.add_transition(hmm.begin(), biased, 0.5);
-			hmm.add_transition(fair, fair, 0.9);
-			hmm.add_transition(fair, biased, 0.1);
-			hmm.add_transition(biased, biased, 0.9);
-			hmm.add_transition(biased, fair, 0.1);
-			hmm.brew();
-			std::vector<std::string> symbols({"T","H","H","T","T","T","H","H"});
-			std::vector<std::string> precomputed_viterbi_path_2_states({"F", "F", "F", "F", "F", "F", "F", "F"});
+			"viterbi decode (2 states casino)",
+			HiddenMarkovModel hmm = casino_hmm;
+			std::vector<std::string> symbols = casino_symbols;
 			std::vector<std::string> viterbi_path_2_states = hmm.viterbi(symbols).first;
-			ASSERT(viterbi_path_2_states == precomputed_viterbi_path_2_states);
+			ASSERT(viterbi_path_2_states == casino_precomputed_viterbi_path_2_states);
+		)
+
+		TEST_UNIT(
+			"viterbi decode / log_likelihood (3 states nucleobase)",
+			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
+			std::vector<std::string> symbols = nucleobase_symbols;
+			double log_likelihood = utils::round_double(hmm.log_likelihood(symbols), 6);
+			ASSERT(log_likelihood == nucleobase_precomputed_log_likelihood);
+			std::vector<std::string> viterbi_path_3_states = hmm.viterbi(symbols).first;
+			ASSERT(viterbi_path_3_states == nucleobase_precomputed_viterbi_path_3_states);
 		)
 
 		TEST_UNIT(
 			"viterbi decode (10 states profile hmm)",
-			HiddenMarkovModel hmm;
-			DiscreteDistribution i_d({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
-			/* Create insert statse. */
-			State i0 = State("I0", i_d);
-			State i1 = State("I1", i_d);
-			State i2 = State("I2", i_d);
-			State i3 = State("I3", i_d);
-			/* Create match states. */
-			State m1 = State("M1", DiscreteDistribution({{"A", 0.95},  {"C", 0.01}, {"G", 0.01},  {"T", 0.02 }}));
-			State m2 = State("M2", DiscreteDistribution({{"A", 0.003}, {"C", 0.99}, {"G", 0.003}, {"T", 0.004}}));
-			State m3 = State("M3", DiscreteDistribution({{"A", 0.01},  {"C", 0.01}, {"G", 0.01},  {"T", 0.97 }}));
-			/* Create delete states. */
-			State d1 = State("D1");
-			State d2 = State("D2");
-			State d3 = State("D3");
-			/* Add all the states. */
-			hmm.add_state(i0);
-			hmm.add_state(i1);
-			hmm.add_state(i2);
-			hmm.add_state(i3);
-			hmm.add_state(m1);
-			hmm.add_state(m2);
-			hmm.add_state(m3);
-			hmm.add_state(d1);
-			hmm.add_state(d2);
-			hmm.add_state(d3);
-			/* Transitions from match states. */
-			hmm.add_transition(hmm.begin(), m1, 0.9);
-			hmm.add_transition(hmm.begin(), i0, 0.1);
-			hmm.add_transition(m1, m2, 0.9);
-			hmm.add_transition(m1, i1, 0.05);
-			hmm.add_transition(m1, d2, 0.05);
-			hmm.add_transition(m2, m3, 0.9);
-			hmm.add_transition(m2, i2, 0.05);
-			hmm.add_transition(m2, d3, 0.05);
-			hmm.add_transition(m3, hmm.end(), 0.9);
-			hmm.add_transition(m3, i3, 0.1);
-			/* Transitions from insert states. */
-			hmm.add_transition(i0, i0, 0.70);
-			hmm.add_transition(i0, d1, 0.15);
-			hmm.add_transition(i0, m1, 0.15);
-			hmm.add_transition(i1, i1, 0.70);
-			hmm.add_transition(i1, d2, 0.15);
-			hmm.add_transition(i1, m2, 0.15);
-			hmm.add_transition(i2, i2, 0.70);
-			hmm.add_transition(i2, d3, 0.15);
-			hmm.add_transition(i2, m3, 0.15);
-			hmm.add_transition(i3, i3, 0.85);
-			hmm.add_transition(i3, hmm.end(), 0.15);
-			/* Transitions from delete states. */
-			hmm.add_transition(d1, d2, 0.15);
-			hmm.add_transition(d1, i1, 0.15);
-			hmm.add_transition(d1, m2, 0.70);
-			hmm.add_transition(d2, d3, 0.15);
-			hmm.add_transition(d2, i2, 0.15);
-			hmm.add_transition(d2, m3, 0.70);
-			hmm.add_transition(d3, i3, 0.30);
-			hmm.add_transition(d3, hmm.end(), 0.70);
-			hmm.brew();
-			std::cout << print_matrix(hmm.raw_transitions(), hmm.states_indices()) << std::endl;
-			std::vector<std::vector<std::string>> sequences(4);
-			sequences[0] = std::vector<std::string>({{"A","C","T"}});
-			sequences[1] = std::vector<std::string>({{"G","G","C"}});
-			sequences[2] = std::vector<std::string>({{"G","A","T"}});
-			sequences[3] = std::vector<std::string>({{"A","C","C"}});
-			double seq1_viterbi_log_likelihood_precomputed = -0.513244900357;
-			double seq2_viterbi_log_likelihood_precomputed = -11.0481012413;
-			double seq3_viterbi_log_likelihood_precomputed = -9.12551967402;
-			double seq4_viterbi_log_likelihood_precomputed = -5.08795587886;
-			std::vector<std::string> seq1_viterbi_path_precomputed({"M1", "M2", "M3"});
-			std::vector<std::string> seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
-			std::vector<std::string> seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
-			std::vector<std::string> seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
-			auto viterbi_seq1 = hmm.viterbi(sequences[0]);
-			auto viterbi_seq2 = hmm.viterbi(sequences[1]);
-			auto viterbi_seq3 = hmm.viterbi(sequences[2]);
-			auto viterbi_seq4 = hmm.viterbi(sequences[3]);
-			double seq1_viterbi_log_likelihood = utils::round_double(viterbi_seq1.second);
-			double seq2_viterbi_log_likelihood = utils::round_double(viterbi_seq2.second);
-			double seq3_viterbi_log_likelihood = utils::round_double(viterbi_seq3.second);
-			double seq4_viterbi_log_likelihood = utils::round_double(viterbi_seq4.second);
-			ASSERT(seq1_viterbi_log_likelihood == seq1_viterbi_log_likelihood_precomputed);
-			ASSERT(seq2_viterbi_log_likelihood == seq2_viterbi_log_likelihood_precomputed);
-			ASSERT(seq3_viterbi_log_likelihood == seq3_viterbi_log_likelihood_precomputed);
-			ASSERT(seq4_viterbi_log_likelihood == seq4_viterbi_log_likelihood_precomputed);
+			HiddenMarkovModel hmm = profile_10_states_hmm;
+			auto viterbi_seq1 = hmm.viterbi(profile_sequences[0]);
+			auto viterbi_seq2 = hmm.viterbi(profile_sequences[1]);
+			auto viterbi_seq3 = hmm.viterbi(profile_sequences[2]);
+			auto viterbi_seq4 = hmm.viterbi(profile_sequences[3]);
+			double seq1_viterbi_log_likelihood = utils::round_double(viterbi_seq1.second, 6);
+			double seq2_viterbi_log_likelihood = utils::round_double(viterbi_seq2.second, 6);
+			double seq3_viterbi_log_likelihood = utils::round_double(viterbi_seq3.second, 6);
+			double seq4_viterbi_log_likelihood = utils::round_double(viterbi_seq4.second, 6);
+			ASSERT(seq1_viterbi_log_likelihood == profile_seq1_viterbi_log_likelihood_precomputed);
+			ASSERT(seq2_viterbi_log_likelihood == profile_seq2_viterbi_log_likelihood_precomputed);
+			ASSERT(seq3_viterbi_log_likelihood == profile_seq3_viterbi_log_likelihood_precomputed);
+			ASSERT(seq4_viterbi_log_likelihood == profile_seq4_viterbi_log_likelihood_precomputed);
 			std::vector<std::string> seq1_viterbi_path = viterbi_seq1.first;
 			std::vector<std::string> seq2_viterbi_path = viterbi_seq2.first;
 			std::vector<std::string> seq3_viterbi_path = viterbi_seq3.first;
 			std::vector<std::string> seq4_viterbi_path = viterbi_seq4.first;
-			ASSERT(seq1_viterbi_path == seq1_viterbi_path_precomputed);
-			ASSERT(seq2_viterbi_path == seq2_viterbi_path_precomputed);
-			ASSERT(seq3_viterbi_path == seq3_viterbi_path_precomputed);
-			ASSERT(seq4_viterbi_path == seq4_viterbi_path_precomputed);
-	)	
+			ASSERT(seq1_viterbi_path == profile_seq1_viterbi_path_precomputed);
+			ASSERT(seq2_viterbi_path == profile_seq2_viterbi_path_precomputed);
+			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
+			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
+		)
+			
 		/* Train Viterbi */
 
 		/* Train B-W */
 
-		/* Sample */
-
 		/* Train stochastic EM */
 
+		/* MLE */
+
+		/* Randomized params */
+
+		/* Profile HMM */
+
+		/* Pair HMM */
+	
+		/* Sample */
 
 		tests_results();
 

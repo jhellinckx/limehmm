@@ -105,11 +105,21 @@ public:
 
 	std::string to_string() const {
 		std::string str = Distribution::to_string() + ": ";
-		std::for_each(_distribution.begin(), _distribution.end(), 
+		if(uses_log_probabilities()){
+			std::for_each(_distribution.begin(), _distribution.end(), 
+				[&str](const std::pair<const std::string,double>& entry){
+					str += entry.first + "(" + std::to_string(exp(entry.second)) + ") ";
+				});
+			str += "-> sum " + std::to_string(exp(prob_sum()));	
+		}
+		else{
+			std::for_each(_distribution.begin(), _distribution.end(), 
 			[&str](const std::pair<const std::string,double>& entry){
 				str += entry.first + "(" + std::to_string(entry.second) + ") ";
 			});
-		str += "-> sum " + std::to_string(prob_sum());
+			str += "-> sum " + std::to_string(prob_sum());
+		}
+		
 		return str;
 	}
 
