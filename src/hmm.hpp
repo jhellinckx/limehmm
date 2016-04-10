@@ -725,7 +725,7 @@ public:
 
 	}
 
-	struct Traceback {
+	class Traceback {
 		struct Node; // forward declaration.
 		typedef std::shared_ptr<Node> NodePtr;
 		struct Node{
@@ -735,34 +735,45 @@ public:
 			Node(std::size_t v, NodePtr p) : previous(p), value(v) {}
 			void set_previous(const NodePtr& p){ previous = p; }
 		};
-		std::size_t nodes;
-		std::vector<NodePtr> previous_nodes;
-		std::vector<NodePtr> current_nodes;
-		Traceback(std::size_t num_nodes) : 
-			nodes(num_nodes), previous_nodes(nodes), current_nodes(nodes) {
-				for(std::size_t i = 0; i < num_nodes; ++i){
-					previous_nodes[i] = NodePtr(new Node(i));
-				}
-			}
+		std::size_t _nodes;
+		std::vector<NodePtr> _previous_nodes;
+		std::vector<NodePtr> _current_nodes;
 
-		void add(std::size_t current){
-			current_nodes[current] = NodePtr(new Node(current));
+		void _init_previous() {
+			for(std::size_t i = 0; i < _nodes; ++i){
+				_previous_nodes[i] = NodePtr(new Node(i));
+			}
+		}
+		void _init_current() {
+			for(std::size_t i = 0; i < _nodes; ++i){
+					_current_nodes[i] = NodePtr(new Node(i));
+			}
 		}
 
+	public:
+		Traceback(std::size_t num_nodes) : 
+			_nodes(num_nodes), _previous_nodes(_nodes), _current_nodes(_nodes) {
+				_init_previous();
+				_init_current();
+			}
+
 		void add_link(std::size_t previous, std::size_t current, bool link_to_current = false) {
-			current_nodes[current]->set_previous((link_to_current) ? current_nodes[previous] : previous_nodes[previous]);
+			_current_nodes[current]->set_previous((link_to_current) ? _current_nodes[previous] : _previous_nodes[previous]);
 		}
 
 		void next_column() {
-			previous_nodes = current_nodes;
-			for(std::size_t i = 0; i < nodes; ++i){
-				current_nodes[i] = NodePtr(new Node(i));
-			}
+			_previous_nodes = _current_nodes;
+			_init_current();
+		}
+
+		void reset() {
+			_init_previous();
+			_init_current();
 		}
 
 		std::vector<std::size_t> from(std::size_t k){
 			std::vector<std::size_t> traceback;
-			NodePtr node_ptr = previous_nodes[k];
+			NodePtr node_ptr = _previous_nodes[k];
 			traceback.push_back(node_ptr->value);
 			while(node_ptr->previous){
 				node_ptr = node_ptr->previous; 
@@ -774,7 +785,7 @@ public:
 
 		std::string to_string() const {
 			std::ostringstream oss;
-			for(NodePtr p_node : current_nodes){
+			for(NodePtr p_node : _current_nodes){
 				oss << p_node->value << " -> ";
 				if(p_node->previous){
 					oss << p_node->previous->value;
