@@ -733,6 +733,7 @@ public:
 			std::size_t value;
 			Node(std::size_t v) : previous(), value(v) {}
 			Node(std::size_t v, NodePtr p) : previous(p), value(v) {}
+			void set_previous(const NodePtr& p){ previous = p; }
 		};
 		std::size_t nodes;
 		std::vector<NodePtr> previous_nodes;
@@ -749,18 +750,19 @@ public:
 		}
 
 		void add_link(std::size_t previous, std::size_t current, bool link_to_current = false) {
-			current_nodes[current] = (link_to_current) ?
-										NodePtr(new Node(current, current_nodes[previous])) : 
-										NodePtr(new Node(current, previous_nodes[previous]));
+			current_nodes[current]->set_previous((link_to_current) ? current_nodes[previous] : previous_nodes[previous]);
 		}
 
 		void next_column() {
 			previous_nodes = current_nodes;
+			for(std::size_t i = 0; i < nodes; ++i){
+				current_nodes[i] = NodePtr(new Node(i));
+			}
 		}
 
 		std::vector<std::size_t> from(std::size_t k){
 			std::vector<std::size_t> traceback;
-			NodePtr node_ptr = current_nodes[k];
+			NodePtr node_ptr = previous_nodes[k];
 			traceback.push_back(node_ptr->value);
 			while(node_ptr->previous){
 				node_ptr = node_ptr->previous; 
@@ -814,9 +816,6 @@ public:
 				if(max_psi < _A.size()){
 					psi.add_link(max_psi, i, true);	
 				}
-				else{
-					psi.add(i);
-				}
 			}
 			psi.next_column();
 			std::vector<double> phi_1(_A.size(), utils::kNegInf);
@@ -836,9 +835,6 @@ public:
 				}
 				if(max_psi < _A.size()){
 					psi.add_link(max_psi, i);
-				}
-				else{
-					psi.add(i);
 				}
 			}
 			/* Then silent states, in toporder. */
@@ -912,6 +908,11 @@ public:
 		}
 	}
 
+	std::vector<double> viterbi_step() {}
+
+	std::vector<double> viterbi_init() {}
+
+
 	std::pair<std::vector<std::string>, double> terminate_viterbi(std::vector<double>& phi_T, Traceback& traceback){
 		double max_phi_T = utils::kNegInf;
 		std::size_t max_state_index = _A.size();
@@ -954,8 +955,9 @@ public:
 	}
 
 	template<typename Sequence>
-	void train_viterbi(std::vector<Sequence>& sequences){
+	void train_viterbi(typename std::vector<Sequence>& sequences){
 		for(Sequence& sequence : sequences){
+			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
 
 		}
 	}
