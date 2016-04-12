@@ -186,7 +186,7 @@ private:
 	std::vector<std::size_t> _free_pi_begin;
 	std::vector<std::size_t> _free_pi_end;
 	/* Only discrete ! */
-	std::vector<std::size_t>_free_emissions; //TODO : For now, free/fixed parameters PER state, do it for every parameter. 
+	std::vector<std::pair<std::size_t, std::string>> _free_emissions; //TODO : For now, free/fixed parameters PER state, do it for every parameter. 
 	std::vector<std::string> _alphabet;
 	void _clear_raw_data() {
 		for(Distribution* dist : _B){
@@ -501,19 +501,6 @@ public:
 		for(std::size_t i = 0; i < A.size(); ++i) { prob_sum_to_end += exp(pi_end[i]); }
 		if(prob_sum_to_end > 0.0) { finite = true; }
 
-		/* Get alphabet. Only discrete ! */
-		std::vector<std::string> alphabet;
-		for(State* p_state : states){
-			if(! p_state.is_silent()){
-				std::vector<std::string>& dist_symbols = p_state->distribution()->symbols();
-				for(const std::string& symbol : symbols){
-					if(std::find(alphabet.begin(), alphabet.end(), symbol) == alphabet.end()){
-						alphabet.push_back(symbol);
-					}
-				}
-			}
-		}
-
 		/* Fill emission matrix with the states PDFs. */
 		std::vector<Distribution*> B(num_states);
 		for(State* p_state : states){
@@ -528,20 +515,41 @@ public:
 			B[states_indices[p_state->name()]] = distribution;
 		}
 
+		/* Get alphabet. Only discrete ! */
+		std::vector<std::string> alphabet;
+		for(const State* p_state : states){
+			if(! p_state.is_silent()){
+				std::vector<std::string>& dist_symbols = p_state->distribution()->symbols();
+				for(const std::string& symbol : symbols){
+					if(std::find(alphabet.begin(), alphabet.end(), symbol) == alphabet.end()){
+						alphabet.push_back(symbol);
+					}
+				}
+			}
+		}
+
+		/* Set free emissions. Only discrete ! */
+		for(const State* p_state : states){
+			if((! p_state->is_silent()) && p_state->has_free_emission()){
+				std::size_t state_id = states_indices[p_state->name()];
+				for(const std::string& symbol : alphabet){
+					free_emissions.push_back(std::make_pair(state_id, symbol));	
+				}
+			}
+		}
+		
 		std::vector<std::size_t> free_emissions;
 		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
 		std::vector<std::size_t> free_pi_begin;
 		std::vector<std::size_t> free_pi_end;
-		/* Set free emissions / transitions. */
+		/* Set free transitions. */
 		for(const State* p_state : states){
-			if((! p_state->is_silent()) && p_state->has_free_emission()){
-				free_emissions.push_back(states_indices[p_state->name()]);
-			}
 			if(p_state->has_free_transition()){
+				std::size_t state_id = states_indices[p_state->name()];
 				auto out_edges = _graph.get_out_edges(*p_state);
-				for(auto edge: out_edges){
-					if(*(edge->to()) == end()){ free_pi_end.push_back(states_indices[p_state->name()]); }
-					else { free_transitions.push_back(std::make_pair(states_indices[p_state->name()], states_indices[edge->to()->name()]);	}
+				for(auto& edge: out_edges){
+					if(*(edge->to()) == end()){ free_pi_end.push_back(state_id); }
+					else { free_transitions.push_back(std::make_pair(state_id, states_indices[edge->to()->name()]);	}
 				}
 			}
 		}
