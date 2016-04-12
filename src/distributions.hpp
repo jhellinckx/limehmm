@@ -168,6 +168,15 @@ public:
 		return _distribution.find(symbol) != _distribution.end();
 	}
 
+	std::vector<std::string> symbols() const {
+		std::vector<std::string> keys;
+		keys.reserve(_distribution.size());
+		for(auto entry : _distribution){
+			keys.push_back(entry.first);
+		}
+		return keys;
+	}
+
 	virtual double& operator[] (const std::string& symbol) {
 		if(!contains(symbol)){
 			_distribution[symbol] = (this->uses_log_probabilities()) ? utils::kNegInf : 0.0;

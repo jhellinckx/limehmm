@@ -98,12 +98,12 @@ public:
 		return repr;
 	}
 
-	bool free_emission() const { return _free_emission; }
-	bool free_transition() const { return _free_transition; }
-	void freeze_emission() { _free_emission = false; }
-	void freeze_transition() { _free_transition = false; }
-	void thaw_emission() { _free_emission = true; }
-	void thaw_transition() { _free_transition = true; }
+	bool has_free_emission() const { return _free_emission; }
+	bool has_free_transition() const { return _free_transition; }
+	void fix_emission() { _free_emission = false; }
+	void fix_transition() { _free_transition = false; }
+	void free_emission() { _free_emission = true; }
+	void free_transition() { _free_transition = true; }
 
 	Distribution& distribution() const {
 		if(_distribution != nullptr){

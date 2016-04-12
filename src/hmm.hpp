@@ -182,7 +182,10 @@ private:
 	std::size_t _silent_states_index;
 	std::size_t _M; //TODO
 	std::size_t _N;
-
+	std::vector<std::pair<std::size_t, std::size_t>> _free_transitions;
+	/* Only discrete ! */
+	std::vector<std::size_t>_free_emissions; //TODO : For now, free/fixed parameters PER state, do it for every parameter. 
+	std::vector<std::string> _alphabet;
 	void _clear_raw_data() {
 		for(Distribution* dist : _B){
 			if(dist != nullptr) delete dist;
@@ -197,6 +200,9 @@ private:
 		_silent_states_index = std::size_t();
 		_M = std::size_t(); 
 		_N = std::size_t();
+		_alphabet.clear();
+		_free_transitions.clear();
+		_free_emissions.clear();
 	}
 
 public:
@@ -491,6 +497,19 @@ public:
 		for(std::size_t i = 0; i < A.size(); ++i) { prob_sum_to_end += exp(pi_end[i]); }
 		if(prob_sum_to_end > 0.0) { finite = true; }
 
+		/* Get alphabet. Only discrete ! */
+		std::vector<std::string> alphabet;
+		for(State* p_state : states){
+			if(! p_state.is_silent()){
+				std::vector<std::string>& dist_symbols = p_state->distribution()->symbols();
+				for(const std::string& symbol : symbols){
+					if(std::find(alphabet.begin(), alphabet.end(), symbol) == alphabet.end()){
+						alphabet.push_back(symbol);
+					}
+				}
+			}
+		}
+
 		/* Fill emission matrix with the states PDFs. */
 		std::vector<Distribution*> B(num_states);
 		for(State* p_state : states){
@@ -504,6 +523,32 @@ public:
 			}
 			B[states_indices[p_state->name()]] = distribution;
 		}
+
+		std::vector<std::size_t> free_emissions;
+		std::vector<std::pair<std::size_t>> free_transitions;
+		std::vector<std::size_t> free_pi_begin;
+		std::vector<std::size_t> free_pi_end;
+		/* Set free emissions / transitions. */
+		for(const State* p_state : states){
+			if((! p_state->is_silent()) && p_state->has_free_emission()){
+				free_emissions.push_back(states_indices[p_state->name()]);
+			}
+			if(p_state->has_free_transition()){
+				auto out_edges = _graph.get_out_edges(*p_state);
+				for(auto edge: out_edges){
+					free_transitions.push_back(states_indices[p_state->name()]);	
+				}
+			}
+		}
+		if(begin().has_free_transition()){
+			auto begin_out_edges = _graph.get_out_edges(begin());
+			for(auto edge: begin_out_edges){
+				free_pi_begin.push_back(states_indices[edge->to()->name()]);
+			}	
+		}
+		
+
+
 		/* Set fields for the hmm raw values. */
 		_A = std::move(A);
 		_B = std::move(B);
@@ -513,6 +558,9 @@ public:
 		_states_names = std::move(states_names);
 		_is_finite = finite;
 		_silent_states_index = normal_states_index;
+		_alphabet = std::move(alphabet);
+		_free_emissions = std::move(_free_emissions);
+		_free_transitions = std::move(_free_transitions);
 	}
 
 	Matrix<double>& raw_transitions() { return _A; }
@@ -921,11 +969,6 @@ public:
 			return phi_t;
 	}
 
-	std::vector<double> viterbi_init() {
-
-	}
-
-
 	std::pair<std::vector<std::string>, double> terminate_viterbi(std::vector<double>& phi_T, Traceback& traceback){
 		double max_phi_T = utils::kNegInf;
 		std::size_t max_state_index = _A.size();
@@ -967,10 +1010,19 @@ public:
 		return viterbi(sequence);
 	}
 
+	unsigned int delta(std::size_t i, std::size_t j){
+		return (unsigned int)(i == j);
+	}
+
+
+
 	template<typename Sequence>
 	void train_viterbi(typename std::vector<Sequence>& sequences){
+		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
+		for(std::size_t)
 		for(Sequence& sequence : sequences){
 			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
+			Traceback psi(_A.size());
 
 			for(std::size_t k = 1; k < sequence.size(); ++k){
 
