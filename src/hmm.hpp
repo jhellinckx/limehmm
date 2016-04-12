@@ -183,6 +183,8 @@ private:
 	std::size_t _M; //TODO
 	std::size_t _N;
 	std::vector<std::pair<std::size_t, std::size_t>> _free_transitions;
+	std::vector<std::size_t> _free_pi_begin;
+	std::vector<std::size_t> _free_pi_end;
 	/* Only discrete ! */
 	std::vector<std::size_t>_free_emissions; //TODO : For now, free/fixed parameters PER state, do it for every parameter. 
 	std::vector<std::string> _alphabet;
@@ -203,6 +205,8 @@ private:
 		_alphabet.clear();
 		_free_transitions.clear();
 		_free_emissions.clear();
+		_free_pi_end.clear();
+		_free_pi_begin.clear();
 	}
 
 public:
@@ -525,7 +529,7 @@ public:
 		}
 
 		std::vector<std::size_t> free_emissions;
-		std::vector<std::pair<std::size_t>> free_transitions;
+		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
 		std::vector<std::size_t> free_pi_begin;
 		std::vector<std::size_t> free_pi_end;
 		/* Set free emissions / transitions. */
@@ -536,7 +540,8 @@ public:
 			if(p_state->has_free_transition()){
 				auto out_edges = _graph.get_out_edges(*p_state);
 				for(auto edge: out_edges){
-					free_transitions.push_back(states_indices[p_state->name()]);	
+					if(*(edge->to()) == end()){ free_pi_end.push_back(states_indices[p_state->name()]); }
+					else { free_transitions.push_back(std::make_pair(states_indices[p_state->name()], states_indices[edge->to()->name()]);	}
 				}
 			}
 		}
@@ -561,6 +566,8 @@ public:
 		_alphabet = std::move(alphabet);
 		_free_emissions = std::move(_free_emissions);
 		_free_transitions = std::move(_free_transitions);
+		_free_pi_begin = std::move(free_pi_begin);
+		_free_pi_end = std::move(free_pi_end);
 	}
 
 	Matrix<double>& raw_transitions() { return _A; }
