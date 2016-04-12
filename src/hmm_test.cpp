@@ -595,7 +595,7 @@ int main(){
 			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
 			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
 		)
-			
+				
 		/* Train Viterbi */
 
 		/* Train B-W */

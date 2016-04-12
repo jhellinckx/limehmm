@@ -202,10 +202,10 @@ private:
 public:
 	/* Default constructor. Inits an empty hmm with default values. */
 	HiddenMarkovModel() : 
-		HiddenMarkovModel("state") {}
+		HiddenMarkovModel(std::to_string((std::ptrdiff_t)this)) {}
 
 	HiddenMarkovModel(const std::string& name) : 
-		HiddenMarkovModel(name, State(hmm_config::kDefaultStartStateLabel + name), 
+		HiddenMarkovModel(name, State(hmm_config::kDefaultStartStateLabel), 
 			State(hmm_config::kDefaultEndStateLabel + name)) {}
 
 	HiddenMarkovModel(const State& begin, const State& end) :
@@ -803,9 +803,20 @@ public:
 	template<typename Sequence>
 	std::pair<std::vector<std::string>, double> viterbi(const Sequence& sequence, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = sequence.size();
-		auto viterbi_init = [&sequence, this]() {
-			std::vector<double> phi_0(_A.size(), utils::kNegInf);
+		if(sequence.size() == 0) throw std::logic_error("viterbi on empty sequence");
+		else{
 			Traceback psi(_A.size());
+			std::vector<double> phi = viterbi_init(psi, sequence);
+			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
+				phi = viterbi_step(phi, psi, t, sequence);
+			}
+			return terminate_viterbi(phi, psi);
+		}
+	}
+
+	template<typename Sequence>
+	std::vector<double> viterbi_init(Traceback& psi, const Sequence& sequence) {
+			std::vector<double> phi_0(_A.size(), utils::kNegInf);
 			/* First iterate over the silent states to compute the max probability of
 			passing through silent states before emitting the first symbol. */
 			double max_phi;
@@ -865,10 +876,12 @@ public:
 				}
 			}
 			psi.next_column();
-			return std::make_pair(phi_1, psi);
+			return phi_1;
 		};
-		auto viterbi_step = [&sequence, this](const std::vector<double>& phi_prev_t, Traceback& psi, std::size_t t) {
-			std::vector<double> phi_t(_A.size(), utils::kNegInf);
+
+	template<typename Sequence>
+	std::vector<double> viterbi_step(const std::vector<double>& phi_prev_t, Traceback& psi, std::size_t t, const Sequence& sequence) {
+		std::vector<double> phi_t(_A.size(), utils::kNegInf);
 			double max_phi;
 			double current_phi;
 			std::size_t max_psi;
@@ -906,22 +919,11 @@ public:
 			}
 			psi.next_column();
 			return phi_t;
-		};
-		if(sequence.size() == 0) throw std::logic_error("viterbi on empty sequence");
-		else{
-			std::pair<std::vector<double>, Traceback> phi_tb = viterbi_init();
-			std::vector<double>& phi = phi_tb.first;
-			Traceback& traceback = phi_tb.second;
-			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
-				phi = viterbi_step(phi, traceback, t);
-			}
-			return terminate_viterbi(phi, traceback);
-		}
 	}
 
-	std::vector<double> viterbi_step() {}
+	std::vector<double> viterbi_init() {
 
-	std::vector<double> viterbi_init() {}
+	}
 
 
 	std::pair<std::vector<std::string>, double> terminate_viterbi(std::vector<double>& phi_T, Traceback& traceback){
@@ -970,6 +972,9 @@ public:
 		for(Sequence& sequence : sequences){
 			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
 
+			for(std::size_t k = 1; k < sequence.size(); ++k){
+
+			}
 		}
 	}
 

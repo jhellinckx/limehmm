@@ -57,8 +57,8 @@ namespace hmm_config {
 	extern const int kDefaultPi = 0;
 	extern const int kDefaultTransitionProbability = 0;
 	extern const int kDefaultEmissionProbability = 0;
-	extern const std::string kDefaultStartStateLabel = "begin_";
-	extern const std::string kDefaultEndStateLabel = "end_";
+	extern const std::string kDefaultStartStateLabel = "begin_state";
+	extern const std::string kDefaultEndStateLabel = "end_state";
 
 	extern const int kDoublePrecision = 8;
 }
