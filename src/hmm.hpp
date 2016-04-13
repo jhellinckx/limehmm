@@ -518,9 +518,9 @@ public:
 		/* Get alphabet. Only discrete ! */
 		std::vector<std::string> alphabet;
 		for(const State* p_state : states){
-			if(! p_state.is_silent()){
-				std::vector<std::string>& dist_symbols = p_state->distribution()->symbols();
-				for(const std::string& symbol : symbols){
+			if(! p_state->is_silent()){
+				std::vector<std::string> dist_symbols = static_cast<DiscreteDistribution*>(&p_state->distribution())->symbols();
+				for(const std::string& symbol : dist_symbols){
 					if(std::find(alphabet.begin(), alphabet.end(), symbol) == alphabet.end()){
 						alphabet.push_back(symbol);
 					}
@@ -529,6 +529,7 @@ public:
 		}
 
 		/* Set free emissions. Only discrete ! */
+		std::vector<std::pair<std::size_t, std::string>> free_emissions;
 		for(const State* p_state : states){
 			if((! p_state->is_silent()) && p_state->has_free_emission()){
 				std::size_t state_id = states_indices[p_state->name()];
@@ -538,18 +539,17 @@ public:
 			}
 		}
 		
-		std::vector<std::size_t> free_emissions;
+		/* Set free transitions. */
 		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
 		std::vector<std::size_t> free_pi_begin;
 		std::vector<std::size_t> free_pi_end;
-		/* Set free transitions. */
 		for(const State* p_state : states){
 			if(p_state->has_free_transition()){
 				std::size_t state_id = states_indices[p_state->name()];
 				auto out_edges = _graph.get_out_edges(*p_state);
 				for(auto& edge: out_edges){
 					if(*(edge->to()) == end()){ free_pi_end.push_back(state_id); }
-					else { free_transitions.push_back(std::make_pair(state_id, states_indices[edge->to()->name()]);	}
+					else { free_transitions.push_back(std::make_pair(state_id, states_indices[edge->to()->name()])); }
 				}
 			}
 		}
@@ -572,8 +572,8 @@ public:
 		_is_finite = finite;
 		_silent_states_index = normal_states_index;
 		_alphabet = std::move(alphabet);
-		_free_emissions = std::move(_free_emissions);
-		_free_transitions = std::move(_free_transitions);
+		_free_emissions = std::move(free_emissions);
+		_free_transitions = std::move(free_transitions);
 		_free_pi_begin = std::move(free_pi_begin);
 		_free_pi_end = std::move(free_pi_end);
 	}
@@ -1034,7 +1034,7 @@ public:
 	template<typename Sequence>
 	void train_viterbi(typename std::vector<Sequence>& sequences){
 		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
-		for(std::size_t)
+
 		for(Sequence& sequence : sequences){
 			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
 			Traceback psi(_A.size());
