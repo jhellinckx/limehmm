@@ -1035,42 +1035,36 @@ public:
 	}
 
 	class TransitionCount{
-		std::vector<std::unordered_map<std::pair<std::size_t, std::size_t>, unsigned int>> _transitions_counts;
+		std::vector<std::vector<unsigned int>> _transitions_counts;
+		std::vector<std::pair<std::size_t, std::size_t>>* _free_transitions;
 	public:
 		TransitionCount(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions, std::size_t M) :
-			_transitions_counts(M){
-				for(std::size_t i = 0; i < M; ++i){
-					for(auto& transition : free_transitions){
-						_transitions_counts[i][transition] = 0;
-					}	
-				}
-		}
+			_transitions_counts(M, std::vector<unsigned int>(free_transitions.size(), 0)),
+			_free_transitions(&free_transitions) {}
 
 		/* Returns the transitions count of given transition for a path finishing at state m. */
-		unsigned int count(const std::pair<std::size_t, std::size_t>& transition, std::size_t m){
-			return _transitions_counts[m][transition];
+		unsigned int count(std::size_t m, std::size_t free_transition_id){
+			return _transitions_counts[m][free_transition_id];
 		}
 
 		/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
 		counts for paths finishing at l and increments it if i == l and j == m. */
 		void operator()(const TransitionCount& previous_counts, std::size_t m, std::size_t l){
-			for(auto& transition_count : _transitions_counts[m]){
-				transition_count.second = previous.count(transition_count.first, l) + delta(l,i)*delta(m,j);
+			std::size_t i,j;
+			for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
+				i = (*_free_transitions)[free_transition_id].first;
+				j = (*_free_transitions)[free_transition_id].second;
+				_transition_counts[m][free_transition_id] = previous.count(l, free_transition_id) + delta(l, i) * delta(m, j);
 			}
 		}
 	};
 
 	class EmissionCount{
-		std::vector<std::unordered_map<std::pair<std::size_t, std::string>, unsigned int>> _emissions_counts;
+		std::vector<std::vector<unsigned int>> _emissions_counts;
+		std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
 	public:
 		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t M) :
-			_emissions_counts(M) {
-				for(std::size_t i = 0; i < M; ++i){
-					for(auto& emission : free_emissions){
-						_emissions_counts[i][emission] = 0;
-					}	
-				}
-		}
+			_emissions_counts(M) {}
 
 		unsigned int count(std::size_t i, std::string gamma, std::size_t m){
 			for(auto& emission_count : _emissions_counts[m]){
