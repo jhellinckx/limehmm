@@ -1054,7 +1054,7 @@ public:
 			for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
 				i = (*_free_transitions)[free_transition_id].first;
 				j = (*_free_transitions)[free_transition_id].second;
-				_transition_counts[m][free_transition_id] = previous.count(l, free_transition_id) + delta(l, i) * delta(m, j);
+				_transition_counts[m][free_transition_id] = previous_counts.count(l, free_transition_id) + delta(l, i) * delta(m, j);
 			}
 		}
 	};
@@ -1064,23 +1064,19 @@ public:
 		std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
 	public:
 		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t M) :
-			_emissions_counts(M) {}
+			_emissions_counts(M, std::vector<unsigned int>(free_emissions.size(), 0)),
+			_free_emissions(&free_emissions) {}
 
-		unsigned int count(std::size_t i, std::string gamma, std::size_t m){
-			for(auto& emission_count : _emissions_counts[m]){
-				if(emission_count.first.first == i && emission_count.first.second == gamma){
-					return emission_count.second;
-				}
-			}
-			return 0;	
+		unsigned int count(std::size_t m, std::size_t free_emission_id){
+			return _emissions_counts[m][free_emission_id];
 		}
 
-		void operator()(std::size_t m, std::size_t l, std::string symbol, const EmissionCount& previous){
-			std::size_t i;
-			std::string gamma;
-			for(auto& emission_count : _emissions_counts[m]){
-				i = emission_count.first.first; gamma = emission_count.first.second;
-				emission_count.second = previous.count(i, gamma, l) + delta(m,i)*delta(gamma,symbol);
+		void operator()(const EmissionCount& previous_counts, std::size_t m, std::size_t l, std::string symbol){
+			std::size_t i; std::string gamma;
+			for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
+				i = (*_free_emissions)[free_emission_id].first;
+				gamma = (*_free_emissions)[free_emission_id].second;
+				_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(m == i) * delta(gamma = symbol);
 			}
 		}
 	};
