@@ -267,6 +267,7 @@ int main(){
 				toposort.push_back(*str_ptr);
 			}
 			ASSERT(toposort == precomputed_toposort);
+			/* Subgraph. */
 			std::vector<std::string> sub_vertices({"C","E"});
 			Graph<std::string> subgraph = g.sub_graph(sub_vertices);
 			std::vector<std::string> sub_graph_vertices;

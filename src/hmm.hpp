@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include <exception>
 #include <stdexcept>
 #include <vector>
@@ -873,7 +874,7 @@ public:
 			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
 				phi = viterbi_step(phi, psi, t, sequence);
 			}
-			return terminate_viterbi(phi, psi);
+			return viterbi_terminate(phi, psi);
 		}
 	}
 
@@ -984,7 +985,7 @@ public:
 			return phi_t;
 	}
 
-	std::pair<std::vector<std::string>, double> terminate_viterbi(std::vector<double>& phi_T, Traceback& traceback){
+	std::pair<std::vector<std::string>, double> viterbi_terminate(std::vector<double>& phi_T, Traceback& traceback){
 		double max_phi_T = utils::kNegInf;
 		std::size_t max_state_index = _A.size();
 		if(_is_finite){
@@ -1029,24 +1030,142 @@ public:
 		return (unsigned int)(i == j);
 	}
 
+	unsigned int delta(std::string i, std::string j){
+		return (unsigned int)(i == j);
+	}
 
+	class TransitionCount{
+		std::vector<std::unordered_map<std::pair<std::size_t, std::size_t>, unsigned int>> _transitions_counts;
+	public:
+		TransitionCount(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions, std::size_t M) :
+			_transitions_counts(M){
+				for(std::size_t i = 0; i < M; ++i){
+					for(auto& transition : free_transitions){
+						_transitions_counts[i][transition] = 0;
+					}	
+				}
+		}
+
+		/* Returns the transitions count of given transition for a path finishing at state m. */
+		unsigned int count(const std::pair<std::size_t, std::size_t>& transition, std::size_t m){
+			return _transitions_counts[m][transition];
+		}
+
+		/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
+		counts for paths finishing at l and increments it if i == l and j == m. */
+		void operator()(const TransitionCount& previous_counts, std::size_t m, std::size_t l){
+			for(auto& transition_count : _transitions_counts[m]){
+				transition_count.second = previous.count(transition_count.first, l) + delta(l,i)*delta(m,j);
+			}
+		}
+	};
+
+	class EmissionCount{
+		std::vector<std::unordered_map<std::pair<std::size_t, std::string>, unsigned int>> _emissions_counts;
+	public:
+		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t M) :
+			_emissions_counts(M) {
+				for(std::size_t i = 0; i < M; ++i){
+					for(auto& emission : free_emissions){
+						_emissions_counts[i][emission] = 0;
+					}	
+				}
+		}
+
+		unsigned int count(std::size_t i, std::string gamma, std::size_t m){
+			for(auto& emission_count : _emissions_counts[m]){
+				if(emission_count.first.first == i && emission_count.first.second == gamma){
+					return emission_count.second;
+				}
+			}
+			return 0;	
+		}
+
+		void operator()(std::size_t m, std::size_t l, std::string symbol, const EmissionCount& previous){
+			std::size_t i;
+			std::string gamma;
+			for(auto& emission_count : _emissions_counts[m]){
+				i = emission_count.first.first; gamma = emission_count.first.second;
+				emission_count.second = previous.count(i, gamma, l) + delta(m,i)*delta(gamma,symbol);
+			}
+		}
+	};
 
 	template<typename Sequence>
 	void train_viterbi(typename std::vector<Sequence>& sequences){
-		std::vector<std::pair<std::size_t, std::size_t>> free_transitions;
-
 		for(Sequence& sequence : sequences){
-			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
+			/* If sequence is empty, go to next sequence. */
+			if(sequence.size() == 0) { continue; }
+			TransitionCount previous_transition_count(_free_transitions, _A.size());
+			TransitionCount next_transition_count(_free_transitions, _A.size());
+			EmissionCount previous_emission_count(_free_emissions, _A.size());
+			EmissionCount next_emission_count(_free_emissions, _A.size());
 			Traceback psi(_A.size());
-
+			std::vector<double> phi = viterbi_init(psi, sequence);
 			for(std::size_t k = 1; k < sequence.size(); ++k){
-
+				phi = viterbi_step(phi, psi, k, sequence);
+				for(std::size_t m = 0; m < _A.size(); ++m){
+					std::vector<std::size_t> previous_states =  psi.from(m);
+					l = previous_states[0];
+					next_transitions(m, l, previous_transitions);
+					next_emissions(m, l, sequence[k], previous_emissions);
+				}
+				psi.reset();
+				previous_transitions = next_transitions;
+				previous_emissions = next_emissions;
+			}
+			//terminate
+			for(std::size_t i = 0; i < _A.size(); ++i){
+				std::size_t transition_index = 0;
+				std::size_t l = i;
+				for(auto& transition_count : transitions_counts[i]){
+					++transition_index;
+				}
 			}
 		}
 	}
 
-	void train_baum_welch() {
+	template<typename Sequence>
+	void train_baum_welch(typename std::vector<Sequence>& sequences) {
+		std::vector<std::map<std::pair<std::size_t, std::size_t>, unsigned int>> transitions_counts;
+		std::vector<std::map<std::pair<std::size_t, std::string>, unsigned int>> emissions_counts;
+		for(std::size_t i = 0; i < _A.size(); ++i){
+			transitions_counts.push_back(std::map<std::pair<std::size_t, std::size_t>, unsigned int>());
+			for(auto& transition : _free_transitions){
+				transitions_counts[i][transition] = 0;
+			}	
+		}
 
+		for(std::size_t i = 0; i < _A.size(); ++i){
+			emissions_counts.push_back(std::map<std::pair<std::size_t, std::string>, unsigned int>());
+			for(auto& emission : _free_emissions){
+				emissions_counts[i][emission] = 0;
+			}	
+		}
+		
+		for(Sequence& sequence : sequences){
+			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
+			Traceback psi(_A.size());
+			std::vector<double> phi = viterbi_init(psi, sequence);
+			for(std::size_t k = 1; k < sequence.size(); ++k){
+				phi = viterbi_step(phi, psi, k, sequence);
+				for(std::size_t i = 0; i < _A.size(); ++i){
+					std::size_t transition_index = 0;
+					for(auto& transition_count : transitions_counts[i]){
+						transition_count.second = (*(transitions_counts[l].begin() + transition_index)).second + 1;
+						++transition_index;
+					}
+				}
+			}
+			//terminate
+			for(std::size_t i = 0; i < _A.size(); ++i){
+				std::size_t transition_index = 0;
+				for(auto& transition_count : transitions_counts[i]){
+					transition_count.second = (*(transitions_counts[i].begin() + transition_index)).second + 1;
+					++transition_index;
+				}
+			}
+		}
 	}
 
 	void train_stochastic_em() {
