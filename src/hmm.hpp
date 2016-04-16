@@ -865,20 +865,6 @@ public:
 	};
 
 	template<typename Sequence>
-	std::pair<std::vector<std::string>, double> viterbi(const Sequence& sequence, std::size_t t_max = 0) {
-		if(t_max == 0) t_max = sequence.size();
-		if(sequence.size() == 0) throw std::logic_error("viterbi on empty sequence");
-		else{
-			Traceback psi(_A.size());
-			std::vector<double> phi = viterbi_init(psi, sequence);
-			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
-				phi = viterbi_step(phi, psi, t, sequence);
-			}
-			return viterbi_terminate(phi, psi);
-		}
-	}
-
-	template<typename Sequence>
 	std::vector<double> viterbi_init(Traceback& psi, const Sequence& sequence) {
 			std::vector<double> phi_0(_A.size(), utils::kNegInf);
 			/* First iterate over the silent states to compute the max probability of
@@ -985,7 +971,7 @@ public:
 			return phi_t;
 	}
 
-	std::pair<std::vector<std::string>, double> viterbi_terminate(std::vector<double>& phi_T, Traceback& traceback){
+	std::size_t viterbi_terminate(std::vector<double>& phi_T, Traceback& traceback){
 		double max_phi_T = utils::kNegInf;
 		std::size_t max_state_index = _A.size();
 		if(_is_finite){
@@ -1007,23 +993,40 @@ public:
 				}
 			}
 		}
-		if(max_phi_T != utils::kNegInf && max_state_index < _A.size()){
-			std::vector<std::size_t> path_indices = traceback.from(max_state_index);
-			std::vector<std::string> path;
-			path.reserve(path_indices.size());
-			for(std::size_t path_index : path_indices){
-				path.push_back(_states_names[path_index]);
-			}
-			return std::make_pair(path, max_phi_T);
-		}
+		return max_state_index;
+	}
+
+	template<typename Sequence>
+	std::pair<std::vector<std::string>, double> viterbi_decode(const Sequence& sequence, std::size_t t_max = 0) {
+		if(t_max == 0) t_max = sequence.size();
+		if(sequence.size() == 0) throw std::logic_error("viterbi on empty sequence");
 		else{
-			/* Sequence is impossible. */
-			return std::make_pair(std::vector<std::string>(), utils::kNegInf);
+			Traceback psi(_A.size());
+			std::vector<double> phi = viterbi_init(psi, sequence);
+			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
+				phi = viterbi_step(phi, psi, t, sequence);
+			}
+			std::size_t max_state_index = viterbi_terminate(phi, psi);
+			double max_phi_T = phi[max_state_index];
+			if(max_phi_T != utils::kNegInf && max_state_index < _A.size()){
+				std::vector<std::size_t> path_indices = traceback.from(max_state_index);
+				std::vector<std::string> path;
+				path.reserve(path_indices.size());
+				for(std::size_t path_index : path_indices){
+					path.push_back(_states_names[path_index]);
+				}
+				return std::make_pair(path, max_phi_T);
+			}
+			else{
+				/* Sequence is impossible. */
+				return std::make_pair(std::vector<std::string>(), utils::kNegInf);
+			}
 		}
 	}
+
 	template<typename Sequence>
-	std::pair<std::vector<std::string>, double> decode(Sequence& sequence) {
-		return viterbi(sequence);
+	std::pair<std::vector<std::string>, double> decode(const Sequence& sequence) {
+		return viterbi_decode(sequence);
 	}
 
 	unsigned int delta(std::size_t i, std::size_t j){
@@ -1159,13 +1162,15 @@ public:
 			/* This hold the counts for each sequence. */
 			TransitionCount previous_transition_count(_free_transitions, _A.size());
 			TransitionCount next_transition_count(_free_transitions, _A.size());
-			EmissionCount previous_emission_count(_free_emissions, _A.size());
-			EmissionCount next_emission_count(_free_emissions, _A.size());
+			EmissionCount previous_emission_count(_free_emissions, _silent_states_index);
+			EmissionCount next_emission_count(_free_emissions, _silent_states_index);
 			/* Iterate over each sequence and compute the counts. */
 			for(Sequence& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
 				Traceback psi(_A.size());
+				/* The initial step is a special case, since we use initial transition probabilities which
+				are not stored in the raw A matrix. */
 				std::vector<double> phi = viterbi_init(psi, sequence);
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
@@ -1184,52 +1189,16 @@ public:
 					previous_transition_count = next_transition_count;
 					previous_emission_count = next_emission_count;
 				}
+				std::pair<>
 			}
+
 			++iteration;
 		}
 	}
 
 	template<typename Sequence>
 	void train_baum_welch(typename std::vector<Sequence>& sequences) {
-		std::vector<std::map<std::pair<std::size_t, std::size_t>, unsigned int>> transitions_counts;
-		std::vector<std::map<std::pair<std::size_t, std::string>, unsigned int>> emissions_counts;
-		for(std::size_t i = 0; i < _A.size(); ++i){
-			transitions_counts.push_back(std::map<std::pair<std::size_t, std::size_t>, unsigned int>());
-			for(auto& transition : _free_transitions){
-				transitions_counts[i][transition] = 0;
-			}	
-		}
-
-		for(std::size_t i = 0; i < _A.size(); ++i){
-			emissions_counts.push_back(std::map<std::pair<std::size_t, std::string>, unsigned int>());
-			for(auto& emission : _free_emissions){
-				emissions_counts[i][emission] = 0;
-			}	
-		}
 		
-		for(Sequence& sequence : sequences){
-			if(sequence.size() == 0) { throw std::logic_error("training on empty sequence"); }
-			Traceback psi(_A.size());
-			std::vector<double> phi = viterbi_init(psi, sequence);
-			for(std::size_t k = 1; k < sequence.size(); ++k){
-				phi = viterbi_step(phi, psi, k, sequence);
-				for(std::size_t i = 0; i < _A.size(); ++i){
-					std::size_t transition_index = 0;
-					for(auto& transition_count : transitions_counts[i]){
-						transition_count.second = (*(transitions_counts[l].begin() + transition_index)).second + 1;
-						++transition_index;
-					}
-				}
-			}
-			//terminate
-			for(std::size_t i = 0; i < _A.size(); ++i){
-				std::size_t transition_index = 0;
-				for(auto& transition_count : transitions_counts[i]){
-					transition_count.second = (*(transitions_counts[i].begin() + transition_index)).second + 1;
-					++transition_index;
-				}
-			}
-		}
 	}
 
 	void train_stochastic_em() {

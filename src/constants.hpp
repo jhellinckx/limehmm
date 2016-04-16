@@ -49,6 +49,10 @@ namespace error_message {
 	}
 }
 
+namespace global_config{
+	extern const int kDoublePrecision = 8;	
+}
+
 namespace hmm_config {
 	extern const bool kFreeEmission = true;
 	extern const bool kFreeTransition = true;
@@ -66,9 +70,6 @@ namespace hmm_config {
 
 	extern const int kAutoStateLabelCountStart = 1;
 	extern const std::string kAutoStateLabelString = "state_";
-	
-	extern const int kDoublePrecision = 8;
-
 }
 
 namespace distribution_config {
