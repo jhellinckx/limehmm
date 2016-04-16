@@ -8,13 +8,13 @@
 #include <limits>
 #include <typeinfo>
 #include <type_traits>
+#include "constants.hpp"
 
 namespace utils {
 	extern const double kInf =  std::numeric_limits<double>::infinity();
 	extern const double kNegInf = -std::numeric_limits<double>::infinity();
-	extern const int kPrecision = 8;
 
-	double round_double(double d, int precision = kPrecision){
+	extern double round_double(double d, int precision = kDoublePrecision){
 		return round(d * pow(10, precision)) / pow(10, precision);
 	}
 

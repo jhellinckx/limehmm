@@ -50,17 +50,25 @@ namespace error_message {
 }
 
 namespace hmm_config {
-	extern const bool kDefaultFreeEmission = true;
-	extern const bool kDefaultFreeTransition = true;
+	extern const bool kFreeEmission = true;
+	extern const bool kFreeTransition = true;
+	extern const int kPiBegin = 0;
+	extern const int kPiEnd = 0;
+	extern const int kTransitionProbability = 0;
+	extern const int kEmissionProbability = 0;
+	extern const std::string kStartStateLabel = "begin_state";
+	extern const std::string kEndStateLabel = "end_state";
+
+	extern const double kPseudocount = 1;
+	extern const double kConvergenceThreshold = 1e-9;
+	extern const unsigned int kMaxIterationsViterbi = 1e8;
+	extern const unsigned int kMinIterationsViterbi = 0;
+
 	extern const int kAutoStateLabelCountStart = 1;
 	extern const std::string kAutoStateLabelString = "state_";
-	extern const int kDefaultPi = 0;
-	extern const int kDefaultTransitionProbability = 0;
-	extern const int kDefaultEmissionProbability = 0;
-	extern const std::string kDefaultStartStateLabel = "begin_state";
-	extern const std::string kDefaultEndStateLabel = "end_state";
-
+	
 	extern const int kDoublePrecision = 8;
+
 }
 
 namespace distribution_config {
