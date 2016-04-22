@@ -1200,9 +1200,10 @@ public:
 			}
 		}
 
-		std::string to_string(std::size_t m, const std::vector<std::string>& names) const {
+		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
 			std::ostringstream oss;
-			oss << "From state " << names[m] << std::endl;
+			std::string name = from.empty() ? names[m] : from;
+			oss << "From state " << name << std::endl;
 			oss << "Begin counts : " << std::endl;
 			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
 				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << _pi_begin_counts[m][begin_transition_id] << ") "; 
@@ -1224,10 +1225,11 @@ public:
 	class EmissionCount{
 		std::vector<std::vector<unsigned int>> _emissions_counts;
 		const std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
+		std::size_t _silent_states_index;
 	public:
-		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_normal_states) :
-			_emissions_counts(num_normal_states, std::vector<unsigned int>(free_emissions.size(), 0)),
-			_free_emissions(&free_emissions) {}
+		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_states, std::size_t silent_states_index) :
+			_emissions_counts(num_states, std::vector<unsigned int>(free_emissions.size(), 0)),
+			_free_emissions(&free_emissions), _silent_states_index(silent_states_index) {}
 
 		EmissionCount& operator=(const EmissionCount& other) {
 			if(this != &other){
@@ -1252,14 +1254,25 @@ public:
 			}	
 		}
 
+		std::size_t last_non_silent_state(const std::vector<std::size_t>& traceback){
+			for(std::size_t i = traceback.size(); i-- > 0;){
+				if(traceback[i] < _silent_states_index){ 
+					return traceback[i];
+				}
+			}
+			return _emissions_counts.size(); //Not found sentinel value. Should never happen though.
+		}
+
 		void update(const EmissionCount& previous_counts, const std::vector<std::size_t>& traceback, std::string symbol){
 			if(!traceback.empty()){
 				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
+				std::size_t transmitter = last_non_silent_state(traceback);
+				if(transmitter == _emissions_counts.size()) return; // Again, this should not happen. 
 				std::size_t i; std::string gamma;
 				for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
 					i = (*_free_emissions)[free_emission_id].first;
 					gamma = (*_free_emissions)[free_emission_id].second;
-					_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(m, i) * delta(gamma, symbol);
+					_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(transmitter, i) * delta(gamma, symbol);
 				}	
 			}
 		}
@@ -1271,6 +1284,18 @@ public:
 				}
 			}
 		}
+
+		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
+			std::ostringstream oss;
+			std::string name = from.empty() ? names[m] : from;
+			oss << "From state " << name << std::endl;
+			oss << "Emissions counts : " << std::endl;
+			for(std::size_t emission_id = 0; emission_id < _emissions_counts[m].size(); ++emission_id){
+				oss << "(" << names[(*_free_emissions)[emission_id].first] << "->" << (*_free_emissions)[emission_id].second << " = " << _emissions_counts[m][emission_id] << ") ";
+			}
+			oss << std::endl;
+			return oss.str();
+		}
 	};
 
 	double train_viterbi(const std::vector<std::vector<std::string>>& sequences, 
@@ -1281,12 +1306,12 @@ public:
 		
 		/* This holds all the counts for the batch of sequences. */
 		TransitionCount total_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, 1);
-		EmissionCount total_emission_count(_free_emissions, 1);
+		EmissionCount total_emission_count(_free_emissions, 1, 0);
 		/* This hold the counts for each sequence. */
 		TransitionCount previous_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
 		TransitionCount next_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		EmissionCount previous_emission_count(_free_emissions, _silent_states_index);
-		EmissionCount next_emission_count(_free_emissions, _silent_states_index);
+		EmissionCount previous_emission_count(_free_emissions, _A.size(), _silent_states_index);
+		EmissionCount next_emission_count(_free_emissions, _A.size(), _silent_states_index);
 		unsigned int iteration = 0;
 		/* Use likelihood to determine convergence. */
 		double delta = utils::kInf;
@@ -1324,12 +1349,6 @@ public:
 					for(std::size_t m = 0; m < _silent_states_index; ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
 						next_transition_count.update(previous_transition_count, traceback_m);
-						for(std::size_t state_id : traceback_m){
-						std::cout << _states_names[state_id] << " ";
-					}
-					std::cout << std::endl;
-					std::cout << next_transition_count.to_string(m, _states_names);
-					std::cout << std::string(50, '-') << std::endl;
 						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
 
 					}
@@ -1348,21 +1367,10 @@ public:
 					if(_is_finite){
 						next_transition_count.update_end(max_state_index);
 					}
-					/* Search last non-silent state in traceback since EmissionCount do not use
-					silent states. */
-					std::vector<std::size_t> traceback = psi.from(max_state_index);
-					std::reverse(traceback.begin(), traceback.end());
-					std::vector<std::size_t>::iterator it = std::find_if(traceback.begin(), traceback.end(), 
-						[this](std::size_t state_id){
-							return state_id < _silent_states_index;
-						});
-					/* Test wether a non-silent state was found. This should always be the case. */
-					if(it != traceback.end()){
-						std::size_t last_non_silent_state = *it;	
-						/* Update the total counts. */
-						total_transition_count.add(next_transition_count, 0, max_state_index);
-						total_emission_count.add(next_emission_count, 0, last_non_silent_state);
-					}
+					/* Update the total counts. */
+					total_transition_count.add(next_transition_count, 0, max_state_index);
+					total_emission_count.add(next_emission_count, 0, max_state_index);
+					std::cout << "VITERBI PATH : " << decode(sequence).first;
 				}
 				/* Reset counts. */
 				next_transition_count.reset();
@@ -1371,7 +1379,9 @@ public:
 				previous_emission_count.reset();
 
 			}
+			std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			std::cout << print_matrix(_A, _states_indices) << std::endl;
 			total_transition_count.reset();
 			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
@@ -1401,7 +1411,7 @@ public:
 		std::size_t state_id;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			state_id = _free_pi_begin[begin_transition_id];
-			_pi_begin[state_id] = log(transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count);
+			_pi_begin[state_id] = (begin_transitions_count == 0) ? utils::kNegInf : log(transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count);
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
@@ -1427,12 +1437,12 @@ public:
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
-			_A[from_state][to_state] = log((transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
+			_A[from_state][to_state] = (out_transitions_counts[from_state] == 0) ? utils::kNegInf : log((transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
 		}
 		/* Don't forget to update the end transitions ! */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
 			state_id = _free_pi_end[end_transition_id];
-			_pi_end[state_id] = log((transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
+			_pi_end[state_id] = (out_transitions_counts[state_id] == 0) ? utils::kNegInf : log((transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
 		}
 	}
 
@@ -1450,7 +1460,7 @@ public:
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			symbol = _free_emissions[emission_id].second;
-			(*_B[state_id])[symbol] = log(emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
+			(*_B[state_id])[symbol] = (all_emissions_counts[state_id] == 0) ? utils::kNegInf : log(emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
 		}
 	}
 
