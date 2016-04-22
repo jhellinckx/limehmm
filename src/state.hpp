@@ -41,12 +41,11 @@ public:
 
 	State(const char* c_str) : State(std::string(c_str)) {}
 
-	template<typename DistributionType>
-	explicit State(const std::string& name, const DistributionType& distribution) : 
+	explicit State(const std::string& name, const Distribution& distribution) : 
 		_name(name), _distribution(nullptr),
 		_free_emission(hmm_config::kDefaultFreeEmission), 
 		_free_transition(hmm_config::kDefaultFreeTransition) {
-			_distribution = new DistributionType(distribution);
+			_distribution = distribution.clone();
 	} 
 
 	State(const State& other) : _name(other._name), _distribution(nullptr) {

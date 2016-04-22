@@ -572,7 +572,7 @@ public:
 		_states_names = std::move(states_names);
 		_is_finite = finite;
 		_silent_states_index = normal_states_index;
-		_alphabet = std::move(alphabet);
+		_alphabet = std::move(alphabet); // DISCRETE ONLY !!
 		_free_emissions = std::move(free_emissions);
 		_free_transitions = std::move(free_transitions);
 		_free_pi_begin = std::move(free_pi_begin);
@@ -781,9 +781,25 @@ public:
 	}
 
 	template<typename Sequence>
+	double log_likelihood(typename const std::vector<Sequence>& sequences, bool do_fwd = true){
+		likelihood = 0;
+		for(const Sequence& sequence : sequences){
+			likelihood += log_likelihood(sequence, do_fwd);	
+		}
+		return likelihood;
+	}
+
+	template<typename Sequence>
 	double likelihood(const Sequence& sequence, bool do_fwd = true){
 		return exp(log_likelihood(sequence, do_fwd));
 	}
+
+	template<typename Sequence>
+	double likelihood(typename const std::vector<Sequence>& sequences, bool do_fwd = true){
+		return exp(log_likelihood(sequences, do_fwd));
+	}
+
+	
 
 	void sample() {
 
@@ -799,6 +815,7 @@ public:
 			Node(std::size_t v, NodePtr p) : previous(p), value(v) {}
 			void set_previous(const NodePtr& p){ previous = p; }
 		};
+
 		std::size_t _nodes;
 		std::vector<NodePtr> _previous_nodes;
 		std::vector<NodePtr> _current_nodes;
@@ -971,7 +988,7 @@ public:
 			return phi_t;
 	}
 
-	std::size_t viterbi_terminate(std::vector<double>& phi_T, Traceback& traceback){
+	std::size_t viterbi_terminate(std::vector<double>& phi_T){
 		double max_phi_T = utils::kNegInf;
 		std::size_t max_state_index = _A.size();
 		if(_is_finite){
@@ -1006,7 +1023,7 @@ public:
 			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
 				phi = viterbi_step(phi, psi, t, sequence);
 			}
-			std::size_t max_state_index = viterbi_terminate(phi, psi);
+			std::size_t max_state_index = viterbi_terminate(phi);
 			double max_phi_T = phi[max_state_index];
 			if(max_phi_T != utils::kNegInf && max_state_index < _A.size()){
 				std::vector<std::size_t> path_indices = traceback.from(max_state_index);
@@ -1037,45 +1054,75 @@ public:
 		return (unsigned int)(i == j);
 	}
 
-	class TransitionCount{
+	class {
 		std::vector<std::vector<unsigned int>> _transitions_counts;
 		std::vector<std::vector<unsigned int>> _pi_begin_counts;
 		std::vector<std::vector<unsigned int>> _pi_end_counts;
-		std::vector<std::pair<std::size_t, std::size_t>>* _free_transitions;
-		std::vector<std::size_t>* _free_pi_begin;
-		std::vector<std::size_t>* _free_pi_end;
+		const std::vector<std::pair<std::size_t, std::size_t>>* _free_transitions;
+		const std::vector<std::size_t>* _free_pi_begin;
+		const std::vector<std::size_t>* _free_pi_end;
 	public:
 		TransitionCount(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions,
 			const std::vector<std::size_t>& free_pi_begin,
 			const std::vector<std::size_t>& free_pi_end,
-			std::size_t M) :
-				_transitions_counts(M, std::vector<unsigned int>(free_transitions.size(), 0)),
-				_pi_begin_counts(M, std::vector<unsigned int>(free_pi_begin.size(), 0)), 
-				_pi_end_counts(M, std::vector<unsigned int>(free_pi_end.size(), 0)),
+			std::size_t num_states) :
+				_transitions_counts(num_states, std::vector<unsigned int>(free_transitions.size(), 0)),
+				_pi_begin_counts(num_states, std::vector<unsigned int>(free_pi_begin.size(), 0)), 
+				_pi_end_counts(num_states, std::vector<unsigned int>(free_pi_end.size(), 0)),
 				_free_transitions(&free_transitions),
 				_free_pi_begin(&free_pi_begin),
 				_free_pi_end(&free_pi_end) {}
+
+		/* /!\ Both transition counts need to represent the same hmm in a given training !! */
+		TransitionCount& operator=(const TransitionCount& other) {
+			if(this != &other){
+				for(std::size_t m = 0; m < _transitions_counts.size(); ++m){
+					for(std::size_t id = 0; id < _transitions_counts[m].size(); ++id){
+						_transitions_counts[m][id] = other._transitions_counts[m][id];
+					}
+					for(std::size_t id = 0; id < _pi_begin_counts[m].size(); ++id){
+						_pi_begin_counts[m][id] = other._pi_begin_counts[m][id];
+					}
+					for(std::size_t id = 0; id < _pi_end_counts[m].size(); ++id){
+						_pi_end_counts[m][id] = other._pi_end_counts[m][id];
+					}
+				}	
+			}
+			return *this;
+		}
+
+		void add(const TransitionCount& other, std::size_t m, std::size_t l){
+			for(std::size_t id = 0; id < _transitions_counts[m].size(); ++id){
+				_transitions_counts[m][id] += other._transitions_counts[l][id];
+			}	
+		}
 
 		/* Returns the transitions count of given transition for a path finishing at state m. */
 		unsigned int count(std::size_t m, std::size_t free_transition_id){
 			return _transitions_counts[m][free_transition_id];
 		}
 
+		unsigned int count_begin(std::size_t m, std::size_t free_transition_id){
+			return _pi_begin_counts[m][free_transition_id];
+		}
+
 		unsigned int count_end(std::size_t m, std::size_t free_pi_begin_id){
-			return _pi_begin_counts[m][free_pi_begin_id];
+			return _pi_end_counts[m][free_pi_begin_id];
+		}
+
+		/* Test wether a transition from i to j occurs in the given traceback.
+		This method should only return 0 or 1. */
+		unsigned int any_of_transitions(const std::vector<std::size_t>& traceback, std::size_t i, std::size_t j){
+			unsigned int delta_sum = 0;
+			for(std::size_t l = 0; l < traceback.size() - 2; ++l){
+				delta_sum += delta(traceback[l], i) * delta(traceback[l+1], j);
+			}
+			return delta_sum;
 		}
 
 		/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
 		counts for paths finishing at l and increments it if i == l and j == m. */
 		void update(const TransitionCount& previous_counts, const std::vector<std::size_t>& traceback){
-			/* This lambda should only returns 0 or 1. */
-			auto is_traceback_transition = [&traceback](std::size_t i, std::size_t j){ 
-				unsigned int delta_sum = 0;
-				for(std::size_t l = 0; l < traceback.size() - 2; ++l){
-					delta_sum += delta(traceback[l], i) * delta(traceback[l+1], j);
-				}
-				return delta_sum;
-			};
 			if(traceback.size() >= 2) {
 				copy_begin();
 				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
@@ -1083,7 +1130,7 @@ public:
 				for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
 					i = (*_free_transitions)[free_transition_id].first;
 					j = (*_free_transitions)[free_transition_id].second;
-					_transition_counts[m][free_transition_id] = previous_counts.count(l, free_transition_id) + is_traceback_transition(i, j);
+					_transition_counts[m][free_transition_id] = previous_counts.count(l, free_transition_id) + any_of_transitions(traceback, i, j);
 				}	
 			}
 		}
@@ -1095,9 +1142,8 @@ public:
 		}
 
 		void update_begin(const TransitionCount& previous_counts, const std::vector<std::size_t>& traceback){
-			if(traceback.size() >= 1){
-				std::size_t l = traceback[0];
-				std::size_t m = traceback[traceback.size() - 1];
+			if(!traceback.empty()){
+				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
 				std::size_t j;
 				for(std::size_t free_pi_begin_id = 0; free_pi_begin_id < _pi_begin_counts[m].size(); ++free_pi_begin_id){
 					j = (*_free_pi_begin)[free_pi_begin_id];
@@ -1124,77 +1170,199 @@ public:
 
 	class EmissionCount{
 		std::vector<std::vector<unsigned int>> _emissions_counts;
-		std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
+		const std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
 	public:
-		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t M) :
-			_emissions_counts(M, std::vector<unsigned int>(free_emissions.size(), 0)),
+		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_normal_states) :
+			_emissions_counts(num_normal_states, std::vector<unsigned int>(free_emissions.size(), 0)),
 			_free_emissions(&free_emissions) {}
+
+		EmissionCount& operator=(const EmissionCount& other) {
+			if(this != &other){
+				for(std::size_t m = 0; m < _emissions_counts.size(); ++m){
+					for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
+						_emissions_counts[m][id] = other._emissions_counts[m][id];
+					}
+				}	
+			}
+			return *this;
+		}
 
 		unsigned int count(std::size_t m, std::size_t free_emission_id){
 			return _emissions_counts[m][free_emission_id];
 		}
 
-		void operator()(const EmissionCount& previous_counts, std::size_t m, std::size_t l, std::string symbol){
-			std::size_t i; std::string gamma;
-			for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
-				i = (*_free_emissions)[free_emission_id].first;
-				gamma = (*_free_emissions)[free_emission_id].second;
-				_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(m, i) * delta(gamma, symbol);
+		/* Adds the counts for arriving at state m of other EmissionCount to the counts of arriving 
+		at state 0 of this EmissionCount. Both counts should have the same sizes. */
+		void add(const EmissionCount& other, std::size_t m, std::size_t l){
+			for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
+				_emissions_counts[m][id] += other._emissions_counts[l][id];
+			}	
+		}
+
+		void update(const EmissionCount& previous_counts, const std::vector<std::size_t>& traceback, std::string symbol){
+			if(!traceback.empty()){
+				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
+				std::size_t i; std::string gamma;
+				for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
+					i = (*_free_emissions)[free_emission_id].first;
+					gamma = (*_free_emissions)[free_emission_id].second;
+					_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(m, i) * delta(gamma, symbol);
+				}	
+			}
+		}
+
+		void reset(){
+			for(std::size_t m = 0; m < _emissions_counts.size(); ++m){
+				for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
+					_emissions_counts[m][id] = 0;
+				}
 			}
 		}
 	};
 
 	template<typename Sequence>
-	void train_viterbi(typename const std::vector<Sequence>& sequences, 
+	double train_viterbi(typename const std::vector<Sequence>& sequences, 
 		double convergence_threshold = hmm_config::kConvergenceThreshold,
 		unsigned int min_iterations = hmm_config::kMinIterationsViterbi, 
 		unsigned int max_iterations = hmm_config::kMaxIterationsViterbi, 
-		double pseudocount = hmm_config::kPseudocount){
+		double transition_pseudocount = hmm_config::kTransitionPseudocount){
 		
+		/* This holds all the counts for the batch of sequences. */
+		TransitionCount total_transition_count(_free_transitions, 1);
+		EmissionCount total_emission_count(_free_emissions, 1);
+		/* This hold the counts for each sequence. */
+		TransitionCount previous_transition_count(_free_transitions, _A.size());
+		TransitionCount next_transition_count(_free_transitions, _A.size());
+		EmissionCount previous_emission_count(_free_emissions, _silent_states_index);
+		EmissionCount next_emission_count(_free_emissions, _silent_states_index);
 		unsigned int iteration = 0;
-		double convergence_delta = utils::kInf;
-		double previous_likelihood, current_likelihood;
-		while((iteration <= min_iterations || convergence_delta > convergence_threshold) 
+		double delta = utils::kInf;
+		double initial_likelihood = log_likelihood(sequences);
+		double previous_likelihood = initial_likelihood;
+		double current_likelihood;
+		while((iteration <= min_iterations || delta > convergence_threshold) 
 			&& iteration <= max_iterations) {
-			/* This holds all the counts for the batch of sequences. */
-			TransitionCount total_transition_count(_free_transitions, 1);
-			EmissionCount total_emission_count(_free_emissions, 1);
-			/* This hold the counts for each sequence. */
-			TransitionCount previous_transition_count(_free_transitions, _A.size());
-			TransitionCount next_transition_count(_free_transitions, _A.size());
-			EmissionCount previous_emission_count(_free_emissions, _silent_states_index);
-			EmissionCount next_emission_count(_free_emissions, _silent_states_index);
 			/* Iterate over each sequence and compute the counts. */
-			for(Sequence& sequence : sequences){
+			for(const Sequence& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
 				Traceback psi(_A.size());
 				/* The initial step is a special case, since we use initial transition probabilities which
-				are not stored in the raw A matrix. */
+				are not stored in the raw A matrix. So, do it outside the for-loop. */
 				std::vector<double> phi = viterbi_init(psi, sequence);
-				for(std::size_t m = 0; m < _A.size(); ++m){
+				/* First iterate only on normal states since emission count are only needed for such states. */
+				for(std::size_t m = 0; m < _silent_states_index; ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
 					next_transition_count.update_begin(previous_transition_count, traceback_m);
-					next_emission_count.update(previous_emission_count, traceback_m);
+					next_emission_count.update(previous_emission_count, traceback_m, sequence[0]);
 				}
+				/* Do silent states transitions. */
+				for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
+					std::vector<std::size_t> traceback_m = psi.from(m);
+					next_transition_count.update_begin(previous_transition_count, traceback_m);
+				}
+				/* Resetting the traceback since we only need the traceback of current viterbi step. */
 				psi.reset();
+				/* Main loop for current sequence. */
 				for(std::size_t k = 1; k < sequence.size(); ++k){
 					phi = viterbi_step(phi, psi, k, sequence);
-					for(std::size_t m = 0; m < _A.size(); ++m){
+					for(std::size_t m = 0; m < _silent_states_index; ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
 						next_transition_count.update(previous_transition_count, traceback_m);
+						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
+					}
+					for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
+						std::vector<std::size_t> traceback_m = psi.from(m);
 						next_emission_count.update(previous_emission_count, traceback_m);
 					}
 					psi.reset();
 					previous_transition_count = next_transition_count;
 					previous_emission_count = next_emission_count;
 				}
-				std::pair<>
-			}
+				std::size_t max_state_index = viterbi_terminate(phi);
+				next_transition_count.update_end(max_state_index);
+				/* Search last normal state in traceback since EmissionCount do not use
+				silent states. */
+				std::size_t last_normal_state;
+				std::vector<std::size_t> traceback = psi.from(max_state_index);
+				for(std::size_t i = traceback.size() - 1; i >= 0; --i){
+					if(traceback[i] < _silent_states_index){
+						last_normal_state = traceback[i];
+						break;
+					}
+				}
+				/* Update the total counts. */
+				total_transition_count.add(next_transition_count, 0, max_state_index);
+				total_emission_count.add(next_emission_count, 0, last_normal_state);
 
+				/* Reset counts. */
+				next_transition_count.reset();
+				next_emission_count.reset();
+			}
+			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			current_likelihood = log_likelihood(sequences);
+			delta = current_likelihood - previous_likelihood;
 			++iteration;
+
+		}
+		/* Return total improvement. */
+		return current_likelihood - initial_likelihood;
+	}
+
+	void update_model_from_counts(const TransitionCount& transitions_counts, 
+		const EmissionCount& emissions_counts, double transition_pseudocount){
+		update_model_transitions_from_counts(transitions_counts, transition_pseudocount);
+		update_model_emissions_from_counts(emissions_counts);
+	}
+
+	void update_model_transitions_from_counts(const TransitionCount& transitions_counts, double transition_pseudocount){
+		/* Update begin transitions. */
+		unsigned int begin_transitions_count = 0;
+		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
+			begin_transitions_count += transitions_counts.count_begin(0, begin_transition_id);
+		}
+		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
+			_pi_begin
+		}
+
+		/* Update other transitions (we also have to take end transitions into account !). */
+		std::unordered_map<std::size_t, unsigned int> out_transitions_counts;
+		std::size_t states_id;
+		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
+			state_id = _free_transitions[transition_id].first;
+			/* If state i not yet in map, init count for state i at 0. */
+			if(out_transitions_counts.find(state_id) == out_transitions_counts.end()){
+				out_transitions_counts[state_id] = 0;
+			}
+			out_transitions_counts[state_id] += transitions_counts.count(0, transition_id) + transition_pseudocount;
+			
+		}
+		std::size_t from_state, to_state;
+		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
+			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
+			_A[from_state][to_state] = (transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state];
 		}
 	}
+
+	void update_model_emissions_from_counts(const EmissionCount& emissions_counts){
+		std::unordered_map<std::size_t, unsigned int> all_emissions_counts;
+		std::size_t state_id;
+		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
+			state_id = _free_emissions[emission_id].first;
+			if(all_emissions_counts.find(state_id) == all_emissions_counts.end()){
+				all_emissions_counts[state_id] = 0;
+			}
+			all_emissions_counts[state_id] += emissions_counts.count(0, emission_id);
+		}
+		std::string symbol;
+		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
+			state_id = _free_emissions[emission_id].first;
+			symbol = _free_emissions[emission_id].second;
+			(*_B[state_id])[symbol] = emissions_counts.count(0, emission_id) / all_emissions_counts[from_state];
+		}
+	}
+
+
 
 	template<typename Sequence>
 	void train_baum_welch(typename std::vector<Sequence>& sequences) {

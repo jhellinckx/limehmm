@@ -597,7 +597,12 @@ int main(){
 			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
 		)
 				
-		/* Train Viterbi */
+		/* Train Viterbi without pseudocounts and without silent states */
+
+		/* Train Viterbi without pseudocounts and with silent states */
+
+		/* Train Viterbi with pseudocounts and with silent states */
+		
 
 		/* Train B-W */
 

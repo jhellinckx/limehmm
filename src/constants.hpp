@@ -63,7 +63,7 @@ namespace hmm_config {
 	extern const std::string kStartStateLabel = "begin_state";
 	extern const std::string kEndStateLabel = "end_state";
 
-	extern const double kPseudocount = 1;
+	extern const double kTransitionPseudocount = 1;
 	extern const double kConvergenceThreshold = 1e-9;
 	extern const unsigned int kMaxIterationsViterbi = 1e8;
 	extern const unsigned int kMinIterationsViterbi = 0;
