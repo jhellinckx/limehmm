@@ -558,7 +558,7 @@ int main(){
 			"viterbi decode (2 states casino)",
 			HiddenMarkovModel hmm = casino_hmm;
 			std::vector<std::string> symbols = casino_symbols;
-			std::vector<std::string> viterbi_path_2_states = hmm.viterbi(symbols).first;
+			std::vector<std::string> viterbi_path_2_states = hmm.decode(symbols).first;
 			ASSERT(viterbi_path_2_states == casino_precomputed_viterbi_path_2_states);
 		)
 
@@ -568,17 +568,17 @@ int main(){
 			std::vector<std::string> symbols = nucleobase_symbols;
 			double log_likelihood = utils::round_double(hmm.log_likelihood(symbols), 6);
 			ASSERT(log_likelihood == nucleobase_precomputed_log_likelihood);
-			std::vector<std::string> viterbi_path_3_states = hmm.viterbi(symbols).first;
+			std::vector<std::string> viterbi_path_3_states = hmm.decode(symbols).first;
 			ASSERT(viterbi_path_3_states == nucleobase_precomputed_viterbi_path_3_states);
 		)
 
 		TEST_UNIT(
 			"viterbi decode (10 states profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			auto viterbi_seq1 = hmm.viterbi(profile_sequences[0]);
-			auto viterbi_seq2 = hmm.viterbi(profile_sequences[1]);
-			auto viterbi_seq3 = hmm.viterbi(profile_sequences[2]);
-			auto viterbi_seq4 = hmm.viterbi(profile_sequences[3]);
+			auto viterbi_seq1 = hmm.decode(profile_sequences[0]);
+			auto viterbi_seq2 = hmm.decode(profile_sequences[1]);
+			auto viterbi_seq3 = hmm.decode(profile_sequences[2]);
+			auto viterbi_seq4 = hmm.decode(profile_sequences[3]);
 			double seq1_viterbi_log_likelihood = utils::round_double(viterbi_seq1.second, 6);
 			double seq2_viterbi_log_likelihood = utils::round_double(viterbi_seq2.second, 6);
 			double seq3_viterbi_log_likelihood = utils::round_double(viterbi_seq3.second, 6);
