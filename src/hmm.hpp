@@ -1389,15 +1389,41 @@ public:
 		std::string from_state_name, to_state_name;
 		std::size_t from_state_id, to_state_id;
 		double log_probability;
+		/* Update begin transitions. */
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			to_state_id = _free_pi_begin[begin_transition_id];
 			log_probability = _pi_begin[to_state_id];
 			to_state_name = _states_names[to_state_id];
-			_graph.set_weight(begin(), State(to_state), exp(log_probability));
+			_graph.set_weight(begin(), State(to_state_name), exp(log_probability));
+		}
+		/* Update mid transitions. */
+		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
+			from_state_id = _free_transitions[transition_id].first;
+			to_state_id = _free_transitions[transition_id].second;
+			log_probability = _A[from_state_id][to_state_id];
+			from_state_name = _states_names[from_state_id];
+			to_state_name = _states_names[to_state_id];
+			_graph.set_weight(State(from_state_name), State(to_state_name), exp(log_probability));
+		}
+		/* Update end transitions. */
+		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
+			from_state_id = _free_pi_end[end_transition_id];
+			log_probability = _pi_end[from_state_id];
+			from_state_name = _states_names[from_state_id];
+			_graph.set_weight(State(from_state_name), end(), exp(log_probability));
 		}
 
-
-		/* update emissions. */
+		/* Update emissions. */
+		//DISCRETE ONLY !!
+		std::string symbol;
+		std::size_t state_id;
+		std::string state_name;
+		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
+			state_id = _free_emissions[emission_id].first;
+			state_name = _states_names[state_id];
+			symbol = _free_emissions[emission_id].second;
+			_graph.get_vertex(State(state_name))->distribution()[symbol] = exp((*_B[state_id])[symbol]);
+		}
 	}
 
 
