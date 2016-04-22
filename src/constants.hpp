@@ -30,6 +30,7 @@ namespace error_message {
 	extern const std::string kDistributionSymbolNotFound = "symbol not found in distribution";
 
 	/* HMM */
+	extern const std::string kHMMGetStateNotFound = "tried to get a state not contained by the hmm";
 	extern const std::string kHMMHasNoBeginState = "no begin state was found, maybe it has been removed ?";
 	extern const std::string kHMMHasNoEndState = "no end state was found, maybe it has been removed ?";
 	extern const std::string kHMMRemoveStateNotFound = "tried to remove a state not contained by the hmm";

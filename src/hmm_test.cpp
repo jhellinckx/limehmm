@@ -617,6 +617,7 @@ int main(){
 		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		/* Train Viterbi with pseudocounts and with silent states */
 		
+		/* Test fix / free parameters */
 
 		/* Train B-W */
 

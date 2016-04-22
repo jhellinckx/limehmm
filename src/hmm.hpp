@@ -342,6 +342,15 @@ public:
 		}
 	}
 
+	State& get_state(const State& state) {
+		try{
+			return *_graph.get_vertex(state);
+		}
+		catch(const VertexNotFoundException<State>& e){
+			throw StateNotFoundException(e.trigger(), error_message::kHMMGetStateNotFound);
+		}
+	}
+
 	/* See behavior of Graph::add_vertex() */	
 	void add_state(const State& state){
 		try{

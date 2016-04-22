@@ -98,9 +98,7 @@ public:
 	}
 
 	std::string to_string() const {
-		std::string repr = _name + "(";
-		repr += (is_silent() ? "silent" : distribution().name()) + ")";
-		return repr;
+		return _name;
 	}
 
 	bool has_free_emission() const { return _free_emission; }
