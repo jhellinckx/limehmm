@@ -1304,13 +1304,9 @@ public:
 				for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
 					next_transition_count.update_begin(traceback_m);
-					for(std::size_t state_id : traceback_m){
-						std::cout << _states_names[state_id] << " ";
-					}
-					std::cout << std::endl;
-					std::cout << next_transition_count.to_string(m, _states_names);
-					std::cout << std::string(50, '-') << std::endl;
 				}
+				previous_transition_count = next_transition_count;
+				previous_emission_count = next_emission_count;
 				/* Resetting the traceback since we only need the traceback of current viterbi step. */
 				psi.reset();
 				/* Main loop for current sequence. */
@@ -1319,7 +1315,14 @@ public:
 					for(std::size_t m = 0; m < _silent_states_index; ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
 						next_transition_count.update(previous_transition_count, traceback_m);
+						for(std::size_t state_id : traceback_m){
+						std::cout << _states_names[state_id] << " ";
+					}
+					std::cout << std::endl;
+					std::cout << next_transition_count.to_string(m, _states_names);
+					std::cout << std::string(50, '-') << std::endl;
 						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
+
 					}
 					for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
