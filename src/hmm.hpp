@@ -1317,15 +1317,18 @@ public:
 
 	void update_model_transitions_from_counts(const TransitionCount& transitions_counts, double transition_pseudocount){
 		/* Update begin transitions. */
+		/* First, sum all the begin transitions counts. */
 		unsigned int begin_transitions_count = 0;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			begin_transitions_count += transitions_counts.count_begin(0, begin_transition_id);
 		}
+		/* Then, normalize the count of each begin transition by using the total count. */
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
-			_pi_begin
+			_pi_begin[]
 		}
 
-		/* Update other transitions (we also have to take end transitions into account !). */
+		/* Update other transitions (don't forget to take end transitions into account). */
+		/* Similarly to begin transitions, sum, for each state, all its out transitions counts. */
 		std::unordered_map<std::size_t, unsigned int> out_transitions_counts;
 		std::size_t states_id;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
@@ -1335,12 +1338,25 @@ public:
 				out_transitions_counts[state_id] = 0;
 			}
 			out_transitions_counts[state_id] += transitions_counts.count(0, transition_id) + transition_pseudocount;
-			
 		}
+		/* Also add end transitions counts to the the sum. */
+		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
+			state_id = _free_pi_end[end_transition_id];
+			if(out_transitions_counts.find(state_id) == out_transitions_counts.end()){
+				out_transitions_counts[state_id] = 0;
+			}
+			out_transitions_counts[state_id] += transitions_counts.count_end(0, end_transition_id) + transition_pseudocount;
+		}
+		/* Normalize each transition by using the sum. */
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
 			_A[from_state][to_state] = (transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state];
+		}
+		/* Don't forget to update the end transitions ! */
+		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
+			state_id = _free_pi_end[end_transition_id];
+			_pi_end[state_id] = (transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id];
 		}
 	}
 
