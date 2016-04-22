@@ -527,12 +527,12 @@ public:
 	}
 
 	Edge<VertexElementBase>* get_edge(const VertexElementBase& vertex_from, const VertexElementBase& vertex_to){
-		typename std::vector<Edge<VertexElementBase>*>::const_iterator
+		typename std::vector<Edge<VertexElementBase>*>::const_iterator it;
 		if((it = _find_edge(Edge<VertexElementBase>(vertex_from, vertex_to))) != _edges.end()) {
 			return *it;
 		}
 		else{
-			throw throw EdgeNotFoundException<Edge<VertexElementBase>>(edge, error_message::kGetEdgeNotFound);
+			throw EdgeNotFoundException<Edge<VertexElementBase>>(Edge<VertexElementBase>(vertex_from, vertex_to), error_message::kGetEdgeNotFound);
 		}
 	}
 

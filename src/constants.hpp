@@ -54,22 +54,23 @@ namespace global_config{
 }
 
 namespace hmm_config {
-	extern const bool kFreeEmission = true;
-	extern const bool kFreeTransition = true;
-	extern const int kPiBegin = 0;
-	extern const int kPiEnd = 0;
-	extern const int kTransitionProbability = 0;
-	extern const int kEmissionProbability = 0;
-	extern const std::string kStartStateLabel = "begin_state";
-	extern const std::string kEndStateLabel = "end_state";
+	extern const bool kDefaultFreeEmission = true;
+	extern const bool kDefaultFreeTransition = true;
+	extern const int kDefaultPiBegin = 0;
+	extern const int kDefaultPiEnd = 0;
+	extern const int kDefaultTransitionProbability = 0;
+	extern const int kDefaultEmissionProbability = 0;
+	
+	extern const double kDefaultTransitionPseudocount = 1;
+	extern const double kDefaultConvergenceThreshold = 1e-9;
+	extern const unsigned int kDefaultMaxIterationsViterbi = 1e8;
+	extern const unsigned int kDefaultMinIterationsViterbi = 0;
 
-	extern const double kTransitionPseudocount = 1;
-	extern const double kConvergenceThreshold = 1e-9;
-	extern const unsigned int kMaxIterationsViterbi = 1e8;
-	extern const unsigned int kMinIterationsViterbi = 0;
+	extern const std::string kDefaultStartStateLabel = "begin_state";
+	extern const std::string kDefaultEndStateLabel = "end_state";
 
-	extern const int kAutoStateLabelCountStart = 1;
-	extern const std::string kAutoStateLabelString = "state_";
+	extern const int kDefaultStateLabelCountStart = 1;
+	extern const std::string kDefaultStateLabelString = "state_";
 }
 
 namespace distribution_config {
