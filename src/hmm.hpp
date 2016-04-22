@@ -1385,11 +1385,15 @@ public:
 	}
 
 	void update_from_raw(){
-		/* Update transitions. */
-		std::string from_state, to_state;
+		/* Update transitions. Since we use log probabilities in the raw data, don't forget to exp() the log prob. */
+		std::string from_state_name, to_state_name;
+		std::size_t from_state_id, to_state_id;
+		double log_probability;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
-
-			_graph.set_weight(begin(), );
+			to_state_id = _free_pi_begin[begin_transition_id];
+			log_probability = _pi_begin[to_state_id];
+			to_state_name = _states_names[to_state_id];
+			_graph.set_weight(begin(), State(to_state), exp(log_probability));
 		}
 
 
