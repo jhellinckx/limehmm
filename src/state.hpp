@@ -48,19 +48,23 @@ public:
 			_distribution = distribution.clone();
 	} 
 
-	State(const State& other) : _name(other._name), _distribution(nullptr) {
+	State(const State& other) : _name(other._name), _distribution(nullptr), 
+	_free_emission(other._free_emission), _free_transition(other._free_transition) {
 		if(other._distribution != nullptr){
 			_distribution = other._distribution->clone();
 		}
 	}
 
-	State(State&& other) : _name(other._name), _distribution(other._distribution) {
+	State(State&& other) : _name(std::move(other._name)), _distribution(other._distribution),
+	_free_emission(other._free_emission), _free_transition(other._free_transition) {
 		other._distribution = nullptr;
 	}
 
 	State& operator=(const State& other){
 		if(this != &other){
 			_name = other._name;
+			_free_emission = other._free_emission;
+			_free_transition = other._free_transition;
 			if(_distribution != nullptr){
 				delete _distribution;
 			}
@@ -71,7 +75,9 @@ public:
 
 	State& operator=(State&& other){
 		if(this != &other){
-			_name = other._name;
+			_name = std::move(other._name);
+			_free_emission = other._free_emission;
+			_free_transition = other._free_transition;
 			if(_distribution != nullptr){
 				
 				delete _distribution;

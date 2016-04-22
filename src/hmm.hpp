@@ -182,12 +182,13 @@ private:
 	std::size_t _silent_states_index;
 	std::size_t _M; //TODO
 	std::size_t _N;
-	std::vector<std::pair<std::size_t, std::size_t>> _free_transitions;
+	std::vector<std::string> _alphabet;
 	std::vector<std::size_t> _free_pi_begin;
 	std::vector<std::size_t> _free_pi_end;
+	std::vector<std::pair<std::size_t, std::size_t>> _free_transitions;
 	/* Only discrete ! */
 	std::vector<std::pair<std::size_t, std::string>> _free_emissions; //TODO : For now, free/fixed parameters PER state, do it for every parameter. 
-	std::vector<std::string> _alphabet;
+	
 	void _clear_raw_data() {
 		for(Distribution* dist : _B){
 			if(dist != nullptr) delete dist;
@@ -203,10 +204,11 @@ private:
 		_M = std::size_t(); 
 		_N = std::size_t();
 		_alphabet.clear();
+		_free_pi_begin.clear();
+		_free_pi_end.clear();
 		_free_transitions.clear();
 		_free_emissions.clear();
-		_free_pi_end.clear();
-		_free_pi_begin.clear();
+		
 	}
 
 public:
@@ -235,7 +237,9 @@ public:
 		_states_indices(other._states_indices), _states_names(other._states_names),
 		_A(other._A), _B(other._B.size()), _pi_begin(other._pi_begin), _pi_end(other._pi_end),
 		_is_finite(other._is_finite), _silent_states_index(other._silent_states_index),
-		_M(other._M), _N(other._N){
+		_M(other._M), _N(other._N), _alphabet(other._alphabet), _free_pi_begin(other._free_pi_begin), 
+		_free_pi_end(other._free_pi_end), _free_transitions(other._free_transitions),
+		_free_emissions(other._free_emissions) {
 			_begin = _graph.get_vertex(*other._begin);
 			_end = _graph.get_vertex(*other._end);
 			for(std::size_t i = 0; i < other._B.size(); ++i){
@@ -248,7 +252,10 @@ public:
 		_graph(std::move(other._graph)), _states_indices(std::move(other._states_indices)), 
 		_states_names(std::move(other._states_names)), _A(std::move(other._A)), _B(std::move(other._B)), 
 		_pi_begin(std::move(other._pi_begin)), _pi_end(std::move(other._pi_end)), _is_finite(other._is_finite), 
-		_silent_states_index(std::move(other._silent_states_index)), _M(other._M), _N(other._N) {}
+		_silent_states_index(std::move(other._silent_states_index)), _M(other._M), _N(other._N), 
+		_alphabet(std::move(other._alphabet)), _free_pi_begin(std::move(other._free_pi_begin)), 
+		_free_pi_end(std::move(other._free_pi_end)), _free_transitions(std::move(other._free_transitions)),
+		_free_emissions(std::move(other._free_emissions)) {}
 
 	HiddenMarkovModel& operator=(const HiddenMarkovModel& other){
 		if(this != &other){
@@ -269,6 +276,11 @@ public:
 			_silent_states_index = other._silent_states_index;
 			_M = other._M;
 			_N = other._N;
+			_alphabet = other._alphabet;
+			_free_pi_begin = other._free_pi_begin;
+			_free_pi_end = other._free_pi_end;
+			_free_transitions = other._free_transitions;
+			_free_emissions = other._free_emissions;
 		}
 		return *this;
 	}
@@ -290,6 +302,11 @@ public:
 			_silent_states_index = other._silent_states_index;
 			_M = other._M;
 			_N = other._N;
+			_alphabet = std::move(other._alphabet);
+			_free_pi_begin = std::move(other._free_pi_begin);
+			_free_pi_end = std::move(other._free_pi_end);
+			_free_transitions = std::move(other._free_transitions);
+			_free_emissions = std::move(other._free_emissions);
 		}
 		return *this;
 	}
@@ -560,8 +577,6 @@ public:
 			}	
 		}
 		
-
-
 		/* Set fields for the hmm raw values. */
 		_A = std::move(A);
 		_B = std::move(B);
@@ -1108,7 +1123,7 @@ public:
 		This method should only return 0 or 1. */
 		unsigned int any_of_transitions(const std::vector<std::size_t>& traceback, std::size_t i, std::size_t j){
 			unsigned int delta_sum = 0;
-			for(std::size_t l = 0; l < traceback.size() - 2; ++l){
+			for(std::size_t l = 0; l < traceback.size() - 1; ++l){
 				delta_sum += delta(traceback[l], i) * delta(traceback[l+1], j);
 			}
 			return delta_sum;
@@ -1135,15 +1150,21 @@ public:
 			}
 		}
 
-		void update_begin(const TransitionCount& previous_counts, const std::vector<std::size_t>& traceback){
+		void update_begin(const std::vector<std::size_t>& traceback){
 			if(!traceback.empty()){
 				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
-				std::size_t j;
+				std::size_t i,j;
 				for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
 					j = (*_free_pi_begin)[begin_transition_id];
 					_pi_begin_counts[m][begin_transition_id] = delta(l, j); 
 				}
-				update(previous_counts, traceback);
+				if(traceback.size() >= 2){
+					for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
+						i = (*_free_transitions)[free_transition_id].first;
+						j = (*_free_transitions)[free_transition_id].second;
+						_transitions_counts[m][free_transition_id] = any_of_transitions(traceback, i, j);
+					}
+				}
 			}
 		}
 
@@ -1276,13 +1297,19 @@ public:
 				/* First iterate only on normal states since emission count are only needed for such states. */
 				for(std::size_t m = 0; m < _silent_states_index; ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
-					next_transition_count.update_begin(previous_transition_count, traceback_m);
+					next_transition_count.update_begin(traceback_m);
 					next_emission_count.update(previous_emission_count, traceback_m, sequence[0]);
 				}
 				/* Do silent states transitions. */
 				for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
-					next_transition_count.update_begin(previous_transition_count, traceback_m);
+					next_transition_count.update_begin(traceback_m);
+					for(std::size_t state_id : traceback_m){
+						std::cout << _states_names[state_id] << " ";
+					}
+					std::cout << std::endl;
+					std::cout << next_transition_count.to_string(m, _states_names);
+					std::cout << std::string(50, '-') << std::endl;
 				}
 				/* Resetting the traceback since we only need the traceback of current viterbi step. */
 				psi.reset();
@@ -1327,7 +1354,9 @@ public:
 				}
 				/* Reset counts. */
 				next_transition_count.reset();
+				previous_transition_count.reset();
 				next_emission_count.reset();
+				previous_emission_count.reset();
 
 			}
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);

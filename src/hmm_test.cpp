@@ -607,7 +607,7 @@ int main(){
 
 		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		TEST_UNIT(
-			"train Viterbi without pseudocounts and with silent states",
+			"viterbi training without pseudocounts and with silent states",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
 			std::cout << "IMPROVEMENT : " << viterbi_improvement << std::endl << "EXPECTED : "<<precomputed_improvement_no_pseudocount<<std::endl;
