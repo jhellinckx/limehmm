@@ -1386,8 +1386,10 @@ public:
 
 	void update_from_raw(){
 		/* Update transitions. */
+		std::string from_state, to_state;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 
+			_graph.set_weight(begin(), );
 		}
 
 

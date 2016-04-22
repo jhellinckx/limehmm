@@ -76,13 +76,13 @@ class Edge{
 	double* _weight;
 
 public:
-	explicit Edge(const VertexElementBase& from, const VertexElementBase& to, const double& weight) :
+	explicit Edge(const VertexElementBase& from, const VertexElementBase& to, double weight) :
 		_from(&from), _to(&to), _label(""), _weight(new double(weight)) {}
 
 	explicit Edge(const VertexElementBase& from, const VertexElementBase& to, const std::string& label = "") :
 		_from(&from), _to(&to), _label(label), _weight(nullptr) {}
 
-	explicit Edge(const VertexElementBase& from, const VertexElementBase& to, const std::string& label, const double& weight) :
+	explicit Edge(const VertexElementBase& from, const VertexElementBase& to, const std::string& label, double weight) :
 		_from(&from), _to(&to), _label(label), _weight(new double(weight)) {}
 
 
@@ -147,7 +147,7 @@ public:
 	}
 
 	void set_label(const std::string& label) { _label = label; }
-	void set_weight(const double& weight) { 
+	void set_weight(double weight) { 
 		if(_weight == nullptr){
 			_weight = new double;
 		}
@@ -526,6 +526,21 @@ public:
 		}
 	}
 
+	Edge<VertexElementBase>* get_edge(const VertexElementBase& vertex_from, const VertexElementBase& vertex_to){
+		typename std::vector<Edge<VertexElementBase>*>::const_iterator
+		if((it = _find_edge(Edge<VertexElementBase>(vertex_from, vertex_to))) != _edges.end()) {
+			return *it;
+		}
+		else{
+			throw throw EdgeNotFoundException<Edge<VertexElementBase>>(edge, error_message::kGetEdgeNotFound);
+		}
+	}
+
+	void set_weight(const VertexElementBase& vertex_from, const VertexElementBase& vertex_to, double weight){
+		Edge<VertexElementBase>* edge = get_edge(vertex_from, vertex_to);
+		edge->set_weight(weight);
+	}
+
 	void add_vertex(const VertexElementBase& vertex){
 		_add_vertex(vertex);
 	}
@@ -542,11 +557,11 @@ public:
 		_add_edge(Edge<VertexElementBase>(from, to, label));
 	}
 
-	void add_edge(const VertexElementBase& from, const VertexElementBase& to, const double& weight){
+	void add_edge(const VertexElementBase& from, const VertexElementBase& to, double weight){
 		_add_edge(Edge<VertexElementBase>(from, to, weight));
 	}
 
-	void add_edge(const VertexElementBase& from, const VertexElementBase& to, const std::string& label, const double& weight){
+	void add_edge(const VertexElementBase& from, const VertexElementBase& to, const std::string& label, double weight){
 		_add_edge(Edge<VertexElementBase>(from, to, label, weight));
 	}
 
