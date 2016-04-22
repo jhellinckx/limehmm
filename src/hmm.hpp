@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
-#include <sstream>
 #include <algorithm>	
 #include <math.h>	// log, exp
 #include <utility>	// std::pair
@@ -1170,6 +1169,26 @@ public:
 				}
 			}
 		}
+
+		std::string to_string(std::size_t m, const std::vector<std::string>& names) const {
+			std::ostringstream oss;
+			oss << "From state " << names[m] << std::endl;
+			oss << "Begin counts : " << std::endl;
+			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
+				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << _pi_begin_counts[m][begin_transition_id] << ") "; 
+			}
+			oss << std::endl << "Mid counts : " << std::endl;
+			for(std::size_t transition_id = 0; transition_id < _transitions_counts[m].size(); ++transition_id){
+				oss << "(" << names[(*_free_transitions)[transition_id].first] << "->" << 
+				names[(*_free_transitions)[transition_id].second] << " = " << _transitions_counts[m][transition_id] << ") "; 
+			}
+			oss << std::endl << "End counts : " << std::endl;
+			for(std::size_t end_transition_id = 0; end_transition_id < _pi_end_counts[m].size(); ++end_transition_id){
+				oss << "(" << names[(*_free_pi_end)[end_transition_id]] << " = " << _pi_end_counts[m][end_transition_id] << ") "; 
+			}
+			oss << std::endl;
+			return oss.str();
+		}
 	};
 
 	class EmissionCount{
@@ -1224,7 +1243,7 @@ public:
 		}
 	};
 
-	double train_viterbi(const typename std::vector<std::vector<std::string>>& sequences, 
+	double train_viterbi(const std::vector<std::vector<std::string>>& sequences, 
 		double convergence_threshold = hmm_config::kDefaultConvergenceThreshold,
 		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi, 
 		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi, 
@@ -1277,7 +1296,7 @@ public:
 					}
 					for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
-						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
+						next_transition_count.update(previous_transition_count, traceback_m);
 					}
 					psi.reset();
 					previous_transition_count = next_transition_count;
@@ -1317,7 +1336,6 @@ public:
 			current_likelihood = log_likelihood(sequences);
 			delta = current_likelihood - previous_likelihood;
 			++iteration;
-
 		}
 		/* Training is done. Update the real HMM from the raw trained values. */
 		update_from_raw();

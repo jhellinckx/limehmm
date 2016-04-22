@@ -234,6 +234,14 @@ int main(){
 		std::vector<std::string> profile_seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
 		std::vector<std::string> profile_seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
 		std::vector<std::string> profile_seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
+		std::vector<std::vector<std::string>> profile_training_sequences = 
+		{{"A", "C", "T"}, {"A", "C", "T"}, {"A", "C", "C"}, {"A", "C", "T", "C"}, 
+		{"A", "C", "T"}, {"A", "C", "T"}, {"C", "C", "T"}, {"C", "C", "C"}, 
+		{"A", "A", "T"}, {"C", "T"}, {"A", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, 
+		{"C", "T"}, {"C", "T"}, {"C", "T"}, {"A", "C", "T"}, {"A", "C", "T"}, 
+		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
+		double precomputed_improvement_no_pseudocount = 75.8889;
+		double precomputed_improvement_with_pseudocount = 69.8379;
 
 
 		tests_init();
@@ -596,11 +604,17 @@ int main(){
 			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
 			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
 		)
-				
-		/* Train Viterbi without pseudocounts and without silent states */
 
-		/* Train Viterbi without pseudocounts and with silent states */
+		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
+		TEST_UNIT(
+			"train Viterbi without pseudocounts and with silent states",
+			HiddenMarkovModel hmm = profile_10_states_hmm;
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
+			std::cout << "IMPROVEMENT : " << viterbi_improvement << std::endl << "EXPECTED : "<<precomputed_improvement_no_pseudocount<<std::endl;
+			ASSERT(viterbi_improvement == precomputed_improvement_no_pseudocount);
+		)
 
+		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		/* Train Viterbi with pseudocounts and with silent states */
 		
 

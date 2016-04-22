@@ -61,7 +61,7 @@ namespace hmm_config {
 	extern const int kDefaultTransitionProbability = 0;
 	extern const int kDefaultEmissionProbability = 0;
 	
-	extern const double kDefaultTransitionPseudocount = 1;
+	extern const double kDefaultTransitionPseudocount = 0;
 	extern const double kDefaultConvergenceThreshold = 1e-9;
 	extern const unsigned int kDefaultMaxIterationsViterbi = 1e8;
 	extern const unsigned int kDefaultMinIterationsViterbi = 0;
