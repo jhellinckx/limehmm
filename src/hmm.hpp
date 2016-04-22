@@ -1236,6 +1236,7 @@ public:
 		EmissionCount previous_emission_count(_free_emissions, _silent_states_index);
 		EmissionCount next_emission_count(_free_emissions, _silent_states_index);
 		unsigned int iteration = 0;
+		/* Use likelihood to determine convergence. */
 		double delta = utils::kInf;
 		double initial_likelihood = log_likelihood(sequences);
 		double previous_likelihood = initial_likelihood;
@@ -1248,7 +1249,7 @@ public:
 				if(sequence.size() == 0) { continue; }
 				Traceback psi(_A.size());
 				/* The initial step is a special case, since we use initial transition probabilities which
-				are not stored in the raw A matrix. So, do it outside the for-loop. */
+				are not stored in the raw A matrix. */
 				std::vector<double> phi = viterbi_init(psi, sequence);
 				/* First iterate only on normal states since emission count are only needed for such states. */
 				for(std::size_t m = 0; m < _silent_states_index; ++m){
@@ -1281,30 +1282,34 @@ public:
 				}
 				std::size_t max_state_index = viterbi_terminate(phi);
 				next_transition_count.update_end(max_state_index);
-				/* Search last normal state in traceback since EmissionCount do not use
+				/* Search last non-silent state in traceback since EmissionCount do not use
 				silent states. */
-				std::size_t last_normal_state;
+				std::size_t last_non_silent_state;
 				std::vector<std::size_t> traceback = psi.from(max_state_index);
 				for(std::size_t i = traceback.size() - 1; i >= 0; --i){
 					if(traceback[i] < _silent_states_index){
-						last_normal_state = traceback[i];
+						last_non_silent_state = traceback[i];
 						break;
 					}
 				}
 				/* Update the total counts. */
 				total_transition_count.add(next_transition_count, 0, max_state_index);
-				total_emission_count.add(next_emission_count, 0, last_normal_state);
+				total_emission_count.add(next_emission_count, 0, last_non_silent_state);
 
 				/* Reset counts. */
 				next_transition_count.reset();
 				next_emission_count.reset();
 			}
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			total_transition_count.reset();
+			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
 			delta = current_likelihood - previous_likelihood;
 			++iteration;
 
 		}
+		/* Training is done. Update the real HMM from the raw trained values. */
+		update_from_raw();
 		/* Return total improvement. */
 		return current_likelihood - initial_likelihood;
 	}
@@ -1325,7 +1330,7 @@ public:
 		/* Then, normalize the count of each begin transition by using the total count. */
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			state_id = _free_pi_begin[begin_transition_id];
-			_pi_begin[state_id] = transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count;
+			_pi_begin[state_id] = log(transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count);
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
@@ -1352,12 +1357,12 @@ public:
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
-			_A[from_state][to_state] = (transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state];
+			_A[from_state][to_state] = log((transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
 		}
 		/* Don't forget to update the end transitions ! */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
 			state_id = _free_pi_end[end_transition_id];
-			_pi_end[state_id] = (transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id];
+			_pi_end[state_id] = log((transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
 		}
 	}
 
@@ -1375,8 +1380,18 @@ public:
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			symbol = _free_emissions[emission_id].second;
-			(*_B[state_id])[symbol] = emissions_counts.count(0, emission_id) / all_emissions_counts[from_state];
+			(*_B[state_id])[symbol] = log(emissions_counts.count(0, emission_id) / all_emissions_counts[from_state]);
 		}
+	}
+
+	void update_from_raw(){
+		/* Update transitions. */
+		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
+
+		}
+
+
+		/* update emissions. */
 	}
 
 
