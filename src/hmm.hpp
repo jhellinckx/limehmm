@@ -1324,13 +1324,14 @@ public:
 		}
 		/* Then, normalize the count of each begin transition by using the total count. */
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
-			_pi_begin[]
+			state_id = _free_pi_begin[begin_transition_id];
+			_pi_begin[state_id] = transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count;
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
 		/* Similarly to begin transitions, sum, for each state, all its out transitions counts. */
 		std::unordered_map<std::size_t, unsigned int> out_transitions_counts;
-		std::size_t states_id;
+		std::size_t state_id;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			state_id = _free_transitions[transition_id].first;
 			/* If state i not yet in map, init count for state i at 0. */
