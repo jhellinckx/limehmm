@@ -23,7 +23,7 @@
 template<typename Elem>
 using Matrix = std::vector<std::vector<Elem>>;
 
-std::string print_matrix(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
+std::string print_transitions(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
 	std::size_t longest_string = 0;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
@@ -58,6 +58,29 @@ std::string print_matrix(const Matrix<double>& matrix, const std::map<std::strin
 	return out.str();	
 }
 
+std::string print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names){
+	std::ostringstream oss;
+	for(std::size_t state_id = 0; state_id < dists.size(); ++state_id){
+		oss << names[state_id] << " : ";
+		Distribution* dist = dists[state_id];
+		if(dist == nullptr) oss << "Silent";
+		else oss << *dist;
+		oss << std::endl;
+	}
+	return oss.str();
+}
+
+std::string print_names(const std::vector<std::size_t>& ids, const std::vector<std::string>& names){
+	std::ostringstream oss;
+	for(std::size_t id : ids){
+		if(id < names.size()){
+			oss << names[id] << " ";
+		}
+	}
+	oss << std::endl;
+	return oss.str();
+}
+
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
 	for(double d : vec){
 		out << exp(d) << " ";
@@ -79,14 +102,6 @@ std::ostream& operator<<(std::ostream& out, const std::vector<std::string>& vec)
 		out << s << " ";
 	}
 	out << std::endl;
-	return out;
-}
-
-std::ostream& operator<<(std::ostream& out, const std::vector<Distribution*>& vec){
-	for(const Distribution* dist : vec){
-		if(dist == nullptr) out << "Silent" << std::endl;
-		else out << *dist << std::endl;
-	}
 	return out;
 }
 
@@ -1267,7 +1282,7 @@ public:
 			if(!traceback.empty()){
 				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
 				std::size_t transmitter = last_non_silent_state(traceback);
-				if(transmitter == _emissions_counts.size()) return; // Again, this should not happen. 
+				if(transmitter == _emissions_counts.size()) { return; } // Again, this should not happen. 
 				std::size_t i; std::string gamma;
 				for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
 					i = (*_free_emissions)[free_emission_id].first;
@@ -1329,15 +1344,10 @@ public:
 				are not stored in the raw A matrix. */
 				std::vector<double> phi = viterbi_init(psi, sequence);
 				/* First iterate only on normal states since emission count are only needed for such states. */
-				for(std::size_t m = 0; m < _silent_states_index; ++m){
+				for(std::size_t m = 0; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
 					next_transition_count.update_begin(traceback_m);
 					next_emission_count.update(previous_emission_count, traceback_m, sequence[0]);
-				}
-				/* Do silent states transitions. */
-				for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
-					std::vector<std::size_t> traceback_m = psi.from(m);
-					next_transition_count.update_begin(traceback_m);
 				}
 				previous_transition_count = next_transition_count;
 				previous_emission_count = next_emission_count;
@@ -1346,15 +1356,10 @@ public:
 				/* Main loop for current sequence. */
 				for(std::size_t k = 1; k < sequence.size(); ++k){
 					phi = viterbi_step(phi, psi, k, sequence);
-					for(std::size_t m = 0; m < _silent_states_index; ++m){
+					for(std::size_t m = 0; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
 						next_transition_count.update(previous_transition_count, traceback_m);
 						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
-
-					}
-					for(std::size_t m = _silent_states_index; m < _A.size(); ++m){
-						std::vector<std::size_t> traceback_m = psi.from(m);
-						next_transition_count.update(previous_transition_count, traceback_m);
 					}
 					psi.reset();
 					previous_transition_count = next_transition_count;
@@ -1370,7 +1375,9 @@ public:
 					/* Update the total counts. */
 					total_transition_count.add(next_transition_count, 0, max_state_index);
 					total_emission_count.add(next_emission_count, 0, max_state_index);
-					std::cout << "VITERBI PATH : " << decode(sequence).first;
+					//std::cout << "VITERBI PATH : " << decode(sequence).first;
+					//std::cout << sequence << std::endl;
+					//std::cout << next_emission_count.to_string(max_state_index, _states_names) << std::endl;
 				}
 				/* Reset counts. */
 				next_transition_count.reset();
@@ -1379,13 +1386,16 @@ public:
 				previous_emission_count.reset();
 
 			}
-			std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
+			//std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
+			//std::cout << total_emission_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
-			std::cout << print_matrix(_A, _states_indices) << std::endl;
+			//std::cout << print_transitions(_A, _states_indices) << std::endl;
+			//std::cout << print_distributions(_B, _states_names) << std::endl;
 			total_transition_count.reset();
 			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
 			delta = current_likelihood - previous_likelihood;
+			previous_likelihood = current_likelihood;
 			++iteration;
 		}
 		/* Training is done. Update the real HMM from the raw trained values. */
@@ -1405,13 +1415,13 @@ public:
 		/* First, sum all the begin transitions counts. */
 		unsigned int begin_transitions_count = 0;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
-			begin_transitions_count += transitions_counts.count_begin(0, begin_transition_id);
+			begin_transitions_count += transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount;
 		}
 		/* Then, normalize the count of each begin transition by using the total count. */
 		std::size_t state_id;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			state_id = _free_pi_begin[begin_transition_id];
-			_pi_begin[state_id] = (begin_transitions_count == 0) ? utils::kNegInf : log(transitions_counts.count_begin(0, begin_transition_id) / begin_transitions_count);
+			_pi_begin[state_id] = (begin_transitions_count == 0) ? utils::kNegInf : log(((double)transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount) / begin_transitions_count);
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
@@ -1437,12 +1447,12 @@ public:
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
-			_A[from_state][to_state] = (out_transitions_counts[from_state] == 0) ? utils::kNegInf : log((transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
+			_A[from_state][to_state] = (out_transitions_counts[from_state] == 0) ? utils::kNegInf : log(((double)transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
 		}
 		/* Don't forget to update the end transitions ! */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
 			state_id = _free_pi_end[end_transition_id];
-			_pi_end[state_id] = (out_transitions_counts[state_id] == 0) ? utils::kNegInf : log((transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
+			_pi_end[state_id] = (out_transitions_counts[state_id] == 0) ? utils::kNegInf : log(((double)transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
 		}
 	}
 
@@ -1460,7 +1470,7 @@ public:
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			symbol = _free_emissions[emission_id].second;
-			(*_B[state_id])[symbol] = (all_emissions_counts[state_id] == 0) ? utils::kNegInf : log(emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
+			(*(_B[state_id]))[symbol] = (all_emissions_counts[state_id] == 0) ? utils::kNegInf : log((double)emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
 		}
 	}
 
