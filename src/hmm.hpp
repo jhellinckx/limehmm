@@ -58,13 +58,19 @@ std::string print_transitions(const Matrix<double>& matrix, const std::map<std::
 	return out.str();	
 }
 
-std::string print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names){
+std::string print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=false){
 	std::ostringstream oss;
 	for(std::size_t state_id = 0; state_id < dists.size(); ++state_id){
-		oss << names[state_id] << " : ";
 		Distribution* dist = dists[state_id];
 		if(dist == nullptr) oss << "Silent";
-		else oss << *dist;
+		else{
+			oss << names[state_id] << " : ";
+			bool used_log_prob = dist->uses_log_probabilities();
+			dist->log_probabilities(log_prob);
+			oss << *dist;
+			dist->log_probabilities(used_log_prob);
+		}
+		
 		oss << std::endl;
 	}
 	return oss.str();
@@ -1390,11 +1396,14 @@ public:
 			//std::cout << total_emission_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
 			//std::cout << print_transitions(_A, _states_indices) << std::endl;
-			//std::cout << print_distributions(_B, _states_names) << std::endl;
+			//std::cout << _pi_end << std::endl;
+			std::cout << print_distributions(_B, _states_names) << std::endl;
+
 			total_transition_count.reset();
 			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
 			delta = current_likelihood - previous_likelihood;
+
 			previous_likelihood = current_likelihood;
 			++iteration;
 		}

@@ -221,11 +221,7 @@ int main(){
 		profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
 		profile_10_states_hmm.brew(false);
 		/* Precomputed values. */
-		std::vector<std::vector<std::string>> profile_sequences(4);
-		profile_sequences[0] = std::vector<std::string>({{"A","C","T"}});
-		profile_sequences[1] = std::vector<std::string>({{"G","G","C"}});
-		profile_sequences[2] = std::vector<std::string>({{"G","A","T"}});
-		profile_sequences[3] = std::vector<std::string>({{"A","C","C"}});
+		std::vector<std::vector<std::string>> profile_sequences = {{"A","C","T"}, {"G","G","C"},{"G","A","T"},{"A","C","C"}};
 		double profile_seq1_viterbi_log_likelihood_precomputed = utils::round_double(-0.513244900357, 6);
 		double profile_seq2_viterbi_log_likelihood_precomputed = utils::round_double(-11.0481012413, 6);
 		double profile_seq3_viterbi_log_likelihood_precomputed = utils::round_double(-9.12551967402, 6);
@@ -234,6 +230,16 @@ int main(){
 		std::vector<std::string> profile_seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
 		std::vector<std::string> profile_seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
 		std::vector<std::string> profile_seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
+		std::vector<double> precomputed_viterbi_log_likelihoods = {-5.406181012423981, -10.88681993576597, 
+		-3.6244718790494277, -3.644880750680635, -10.674332964640293, -10.393824835172445, -8.67126440174503, 
+		-16.903451796110275, -16.451699654050792, -0.5132449003570658, -11.048101241343396, -9.125519674022627, 
+		-5.0879558788604475};
+		for(double& likelihood : precomputed_viterbi_log_likelihoods){ likelihood = utils::round_double(likelihood); }
+		std::vector<std::vector<std::string>> profile_viterbi_decode_sequences = 
+		{{"A"}, {"G", "A"}, {"A", "C"}, {"A", "T"}, {"A", "T", "C", "C"}, 
+		{"A", "C", "G", "T", "G"}, {"A", "T", "T", "T"}, {"T", "A", "C", "C", "C", "T", "C"}, 
+		{"T", "G", "T", "C", "A", "A", "C", "A", "C", "T"}, {"A", "C", "T"}, {"G", "G", "C"},
+		{"G", "A", "T"}, {"A", "C", "C"}};
 		std::vector<std::vector<std::string>> profile_training_sequences = 
 		{{"A", "C", "T"}, {"A", "C", "T"}, {"A", "C", "C"}, {"A", "C", "T", "C"}, 
 		{"A", "C", "T"}, {"A", "C", "T"}, {"C", "C", "T"}, {"C", "C", "C"}, 
@@ -603,6 +609,10 @@ int main(){
 			ASSERT(seq2_viterbi_path == profile_seq2_viterbi_path_precomputed);
 			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
 			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
+			for(std::size_t i = 0; i < precomputed_viterbi_log_likelihoods.size() ; ++i){
+				double viterbi_log_likelihood = utils::round_double(hmm.decode(profile_viterbi_decode_sequences[i]).second);
+				ASSERT(viterbi_log_likelihood == precomputed_viterbi_log_likelihoods[i]);
+			}
 		)
 
 		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
