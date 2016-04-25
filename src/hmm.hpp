@@ -1612,11 +1612,48 @@ public:
 
 
 
-	void train_baum_welch(const std::vector<std::vector<std::string>>& sequences) {
-		/* Initialization. */
-		std::vector<double> beta_T = backward_init();
+	double train_baum_welch(const std::vector<std::vector<std::string>>& sequences, 
+		double transition_pseudocount = hmm_config::kDefaultTransitionPseudocount,
+		double convergence_threshold = hmm_config::kDefaultConvergenceThreshold,
+		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi, 
+		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi){
 
+		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1);
+		EmissionScore total_emission_score(_free_emissions, 1);
 
+		TransitionScore previous_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
+		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
+		EmissionScore previous_emission_score(_free_emissions, _A.size());
+		EmissionScore next_emission_score(_free_emissions, _A.size());
+		unsigned int iteration = 0;
+		/* Use likelihood to determine convergence. */
+		double delta = utils::kInf;
+		double initial_likelihood = log_likelihood(sequences);
+		double previous_likelihood = initial_likelihood;
+		double current_likelihood;
+		while((iteration <= min_iterations || delta > convergence_threshold) 
+			&& iteration <= max_iterations) {
+			/* Iterate over each sequence and compute the counts. */
+			for(const std::vector<std::string>& sequence : sequences){
+				/* If sequence is empty, go to next sequence. */
+				if(sequence.size() == 0) { continue; }
+				
+				/* Reset counts. */
+				next_transition_score.reset();
+				previous_transition_score.reset();
+				next_emission_score.reset();
+				previous_emission_score.reset();
+			}
+			//update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			total_transition_score.reset();
+			total_emission_score.reset();
+			current_likelihood = log_likelihood(sequences);
+			delta = current_likelihood - previous_likelihood;
+			previous_likelihood = current_likelihood;
+			++iteration;
+		}
+		update_from_raw();
+		return current_likelihood - initial_likelihood;
 	}
 
 	void train_stochastic_em() {

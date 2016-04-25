@@ -640,7 +640,6 @@ int main(){
 			}
 		)
 
-		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		TEST_UNIT(
 			"viterbi training without pseudocounts and with silent states",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
@@ -648,7 +647,6 @@ int main(){
 			ASSERT(viterbi_improvement == precomputed_improvement_no_pseudocount);
 		)
 
-		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		TEST_UNIT(
 			"viterbi training with pseudocounts and with silent states",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
