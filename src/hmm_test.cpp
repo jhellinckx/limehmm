@@ -246,8 +246,8 @@ int main(){
 		{"A", "A", "T"}, {"C", "T"}, {"A", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, 
 		{"C", "T"}, {"C", "T"}, {"C", "T"}, {"A", "C", "T"}, {"A", "C", "T"}, 
 		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
-		double precomputed_improvement_no_pseudocount = 75.8889;
-		double precomputed_improvement_with_pseudocount = 69.8379;
+		double precomputed_improvement_no_pseudocount = 84.9318;
+		double precomputed_improvement_with_pseudocount = 78.9441;
 
 
 		tests_init();
@@ -620,18 +620,26 @@ int main(){
 			"viterbi training without pseudocounts and with silent states",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
-			std::cout << "IMPROVEMENT : " << viterbi_improvement << std::endl << "EXPECTED : "<<precomputed_improvement_no_pseudocount<<std::endl;
 			ASSERT(viterbi_improvement == precomputed_improvement_no_pseudocount);
 		)
 
 		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
-		/* Train Viterbi with pseudocounts and with silent states */
-		
-		/* Test fix / free parameters */
+		TEST_UNIT(
+			"train viterbi with pseudocounts and with silent states",
+			HiddenMarkovModel hmm = profile_10_states_hmm;
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences, 1.0), 4);
+			ASSERT(viterbi_improvement == precomputed_improvement_with_pseudocount);
+		)
 
 		/* Train B-W */
 
+		/* Test fix / free parameters */
+
+		
+
 		/* Train stochastic EM */
+
+		/* Test tied distributions */
 
 		/* MLE */
 

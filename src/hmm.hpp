@@ -87,6 +87,32 @@ std::string print_names(const std::vector<std::size_t>& ids, const std::vector<s
 	return oss.str();
 }
 
+std::string print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+	std::ostringstream oss;
+	oss << "Pi begin : ";
+	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
+		oss << names[state_id] << "(";
+		if(log_prob) oss << pi[state_id];
+		else oss << exp(pi[state_id]);
+		oss << ") ";
+	}
+	oss << std::endl;
+	return oss.str();
+}
+
+std::string print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+	std::ostringstream oss;
+	oss << "Pi end : ";
+	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
+		oss << names[state_id] << "(";
+		if(log_prob) oss << pi[state_id];
+		else oss << exp(pi[state_id]);
+		oss << ") ";
+	}
+	oss << std::endl;
+	return oss.str();
+}
+
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
 	for(double d : vec){
 		out << exp(d) << " ";
@@ -1320,11 +1346,11 @@ public:
 	};
 
 	double train_viterbi(const std::vector<std::vector<std::string>>& sequences, 
+		double transition_pseudocount = hmm_config::kDefaultTransitionPseudocount,
 		double convergence_threshold = hmm_config::kDefaultConvergenceThreshold,
 		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi, 
-		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi, 
-		double transition_pseudocount = hmm_config::kDefaultTransitionPseudocount){
-		
+		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi){
+
 		/* This holds all the counts for the batch of sequences. */
 		TransitionCount total_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, 1);
 		EmissionCount total_emission_count(_free_emissions, 1, 0);
@@ -1381,29 +1407,18 @@ public:
 					/* Update the total counts. */
 					total_transition_count.add(next_transition_count, 0, max_state_index);
 					total_emission_count.add(next_emission_count, 0, max_state_index);
-					//std::cout << "VITERBI PATH : " << decode(sequence).first;
-					//std::cout << sequence << std::endl;
-					//std::cout << next_emission_count.to_string(max_state_index, _states_names) << std::endl;
 				}
 				/* Reset counts. */
 				next_transition_count.reset();
 				previous_transition_count.reset();
 				next_emission_count.reset();
 				previous_emission_count.reset();
-
 			}
-			//std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
-			//std::cout << total_emission_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
-			//std::cout << print_transitions(_A, _states_indices) << std::endl;
-			//std::cout << _pi_end << std::endl;
-			std::cout << print_distributions(_B, _states_names) << std::endl;
-
 			total_transition_count.reset();
 			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
 			delta = current_likelihood - previous_likelihood;
-
 			previous_likelihood = current_likelihood;
 			++iteration;
 		}
@@ -1430,7 +1445,9 @@ public:
 		std::size_t state_id;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			state_id = _free_pi_begin[begin_transition_id];
-			_pi_begin[state_id] = (begin_transitions_count == 0) ? utils::kNegInf : log(((double)transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount) / begin_transitions_count);
+			if(begin_transitions_count > 0){
+				_pi_begin[state_id] = log(((double)transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount) / begin_transitions_count);
+			}
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
@@ -1456,12 +1473,16 @@ public:
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
-			_A[from_state][to_state] = (out_transitions_counts[from_state] == 0) ? utils::kNegInf : log(((double)transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
+			if(out_transitions_counts[from_state] > 0){
+				_A[from_state][to_state] =  log(((double)transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
+			}
 		}
 		/* Don't forget to update the end transitions ! */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
 			state_id = _free_pi_end[end_transition_id];
-			_pi_end[state_id] = (out_transitions_counts[state_id] == 0) ? utils::kNegInf : log(((double)transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
+			if(out_transitions_counts[state_id] > 0){
+				_pi_end[state_id] = log(((double)transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
+			}
 		}
 	}
 
@@ -1479,7 +1500,9 @@ public:
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			symbol = _free_emissions[emission_id].second;
-			(*(_B[state_id]))[symbol] = (all_emissions_counts[state_id] == 0) ? utils::kNegInf : log((double)emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
+			if(all_emissions_counts[state_id] > 0) {
+				(*(_B[state_id]))[symbol] = log((double)emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
+			}
 		}
 	}
 
