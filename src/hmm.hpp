@@ -1271,65 +1271,57 @@ public:
 		}
 	};
 
-	class EmissionCount{
-		std::vector<std::vector<unsigned int>> _emissions_counts;
+	class EmissionScore{
+		std::vector<std::vector<double>> _emissions_scores;
 		const std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
-		std::size_t _silent_states_index;
 	public:
-		EmissionCount(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_states, std::size_t silent_states_index) :
-			_emissions_counts(num_states, std::vector<unsigned int>(free_emissions.size(), 0)),
-			_free_emissions(&free_emissions), _silent_states_index(silent_states_index) {}
+		EmissionScore(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_states) :
+			_emissions_scores(num_states, std::vector<double>(free_emissions.size(), 0)),
+			_free_emissions(&free_emissions) {}
 
-		EmissionCount& operator=(const EmissionCount& other) {
+		EmissionScore& operator=(const EmissionScore& other) {
 			if(this != &other){
-				for(std::size_t m = 0; m < _emissions_counts.size(); ++m){
-					for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
-						_emissions_counts[m][id] = other._emissions_counts[m][id];
+				for(std::size_t m = 0; m < _emissions_scores.size(); ++m){
+					for(std::size_t id = 0; id < _emissions_scores[m].size(); ++id){
+						_emissions_scores[m][id] = other._emissions_scores[m][id];
 					}
 				}	
 			}
 			return *this;
 		}
 
-		unsigned int count(std::size_t m, std::size_t free_emission_id) const {
-			return _emissions_counts[m][free_emission_id];
+		std::size_t get_state_id(std::size_t free_emission_id) const {
+			return (*_free_emissions)[free_emission_id].first;
 		}
 
-		/* Adds the counts for arriving at state m of other EmissionCount to the counts of arriving 
-		at state 0 of this EmissionCount. Both counts should have the same sizes. */
-		void add(const EmissionCount& other, std::size_t m, std::size_t l){
-			for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
-				_emissions_counts[m][id] += other._emissions_counts[l][id];
+		std::string get_symbol(std::size_t free_emission_id) const {
+			return (*_free_emissions)[free_emission_id].second;
+		}
+
+		double score(std::size_t m, std::size_t free_emission_id) const {
+			return _emissions_scores[m][free_emission_id];
+		}
+
+		void set_score(std::size_t m, std::size_t free_emission_id, double score){
+			_emissions_scores[m][free_emission_id] = score;
+		}
+
+		std::size_t num_free_emissions() const {
+			return _free_emissions->size();
+		}
+
+		/* Adds the scores for arriving at state m of other EmissionScore to the scores of arriving 
+		at state 0 of this EmissionScore. Both scores should have the same sizes. */
+		void add(const EmissionScore& other, std::size_t m, std::size_t l){
+			for(std::size_t id = 0; id < _emissions_scores[m].size(); ++id){
+				_emissions_scores[m][id] += other._emissions_scores[l][id];
 			}	
 		}
 
-		std::size_t last_non_silent_state(const std::vector<std::size_t>& traceback){
-			for(std::size_t i = traceback.size(); i-- > 0;){
-				if(traceback[i] < _silent_states_index){ 
-					return traceback[i];
-				}
-			}
-			return _emissions_counts.size(); //Not found sentinel value. Should never happen though.
-		}
-
-		void update(const EmissionCount& previous_counts, const std::vector<std::size_t>& traceback, std::string symbol){
-			if(!traceback.empty()){
-				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
-				std::size_t transmitter = last_non_silent_state(traceback);
-				if(transmitter == _emissions_counts.size()) { return; } // Again, this should not happen. 
-				std::size_t i; std::string gamma;
-				for(std::size_t free_emission_id = 0; free_emission_id < _emissions_counts[m].size(); ++free_emission_id){
-					i = (*_free_emissions)[free_emission_id].first;
-					gamma = (*_free_emissions)[free_emission_id].second;
-					_emissions_counts[m][free_emission_id] = previous_counts.count(l, free_emission_id) + delta(transmitter, i) * delta(gamma, symbol);
-				}	
-			}
-		}
-
 		void reset(){
-			for(std::size_t m = 0; m < _emissions_counts.size(); ++m){
-				for(std::size_t id = 0; id < _emissions_counts[m].size(); ++id){
-					_emissions_counts[m][id] = 0;
+			for(std::size_t m = 0; m < _emissions_scores.size(); ++m){
+				for(std::size_t id = 0; id < _emissions_scores[m].size(); ++id){
+					_emissions_scores[m][id] = 0;
 				}
 			}
 		}
@@ -1338,14 +1330,37 @@ public:
 			std::ostringstream oss;
 			std::string name = from.empty() ? names[m] : from;
 			oss << "From state " << name << std::endl;
-			oss << "Emissions counts : " << std::endl;
-			for(std::size_t emission_id = 0; emission_id < _emissions_counts[m].size(); ++emission_id){
-				oss << "(" << names[(*_free_emissions)[emission_id].first] << "->" << (*_free_emissions)[emission_id].second << " = " << _emissions_counts[m][emission_id] << ") ";
+			oss << "Emissions scores : " << std::endl;
+			for(std::size_t emission_id = 0; emission_id < _emissions_scores[m].size(); ++emission_id){
+				oss << "(" << names[(*_free_emissions)[emission_id].first] << "->" << (*_free_emissions)[emission_id].second << " = " << _emissions_scores[m][emission_id] << ") ";
 			}
 			oss << std::endl;
 			return oss.str();
 		}
 	};
+
+	std::size_t last_non_silent_state(const std::vector<std::size_t>& traceback){
+		for(std::size_t i = traceback.size(); i-- > 0;){
+			if(traceback[i] < _silent_states_index){ 
+				return traceback[i];
+			}
+		}
+		return _A.size(); //Not found sentinel value. Should never happen though.
+	}
+
+	void update_emissions(const EmissionScore& previous_counts, EmissionScore& next_counts, const std::vector<std::size_t>& traceback, std::string symbol){
+		if(!traceback.empty()){
+			std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
+			std::size_t transmitter = last_non_silent_state(traceback);
+			if(transmitter == _A.size()) { return; } // This should not happen. 
+			std::size_t i; std::string gamma;
+			for(std::size_t free_emission_id = 0; free_emission_id < next_counts.num_free_emissions(); ++free_emission_id){
+				i = next_counts.get_state_id(free_emission_id);
+				gamma = next_counts.get_symbol(free_emission_id);
+				next_counts.set_score(m, free_emission_id, previous_counts.score(l, free_emission_id) + delta(transmitter, i) * delta(gamma, symbol));
+			}	
+		}
+	}
 
 	/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
 		counts for paths finishing at l and increments it if i == l and j == m. */
@@ -1399,12 +1414,12 @@ public:
 
 		/* This holds all the counts for the batch of sequences. */
 		TransitionScore total_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, 1);
-		EmissionCount total_emission_count(_free_emissions, 1, 0);
+		EmissionScore total_emission_count(_free_emissions, 1);
 		/* This hold the counts for each sequence. */
 		TransitionScore previous_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
 		TransitionScore next_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		EmissionCount previous_emission_count(_free_emissions, _A.size(), _silent_states_index);
-		EmissionCount next_emission_count(_free_emissions, _A.size(), _silent_states_index);
+		EmissionScore previous_emission_count(_free_emissions, _A.size());
+		EmissionScore next_emission_count(_free_emissions, _A.size());
 		unsigned int iteration = 0;
 		/* Use likelihood to determine convergence. */
 		double delta = utils::kInf;
@@ -1425,7 +1440,7 @@ public:
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
 					update_begin(next_transition_count, traceback_m);
-					next_emission_count.update(previous_emission_count, traceback_m, sequence[0]);
+					update_emissions(previous_emission_count, next_emission_count, traceback_m, sequence[0]);
 				}
 				previous_transition_count = next_transition_count;
 				previous_emission_count = next_emission_count;
@@ -1437,7 +1452,7 @@ public:
 					for(std::size_t m = 0; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
 						update(previous_transition_count, next_transition_count, traceback_m);
-						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
+						update_emissions(previous_emission_count, next_emission_count, traceback_m, sequence[k]);
 					}
 					psi.reset();
 					previous_transition_count = next_transition_count;
@@ -1460,7 +1475,6 @@ public:
 				next_emission_count.reset();
 				previous_emission_count.reset();
 			}
-			std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
 			total_transition_count.reset();
 			total_emission_count.reset();
@@ -1476,7 +1490,7 @@ public:
 	}
 
 	void update_model_from_counts(const TransitionScore& transitions_counts, 
-		const EmissionCount& emissions_counts, double transition_pseudocount){
+		const EmissionScore& emissions_counts, double transition_pseudocount){
 		update_model_transitions_from_counts(transitions_counts, transition_pseudocount);
 		update_model_emissions_from_counts(emissions_counts);
 	}
@@ -1533,22 +1547,22 @@ public:
 		}
 	}
 
-	void update_model_emissions_from_counts(const EmissionCount& emissions_counts){
-		std::unordered_map<std::size_t, unsigned int> all_emissions_counts;
+	void update_model_emissions_from_counts(const EmissionScore& emissions_counts){
+		std::unordered_map<std::size_t, double> all_emissions_counts;
 		std::size_t state_id;
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			if(all_emissions_counts.find(state_id) == all_emissions_counts.end()){
 				all_emissions_counts[state_id] = 0;
 			}
-			all_emissions_counts[state_id] += emissions_counts.count(0, emission_id);
+			all_emissions_counts[state_id] += emissions_counts.score(0, emission_id);
 		}
 		std::string symbol;
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
 			state_id = _free_emissions[emission_id].first;
 			symbol = _free_emissions[emission_id].second;
 			if(all_emissions_counts[state_id] > 0) {
-				(*(_B[state_id]))[symbol] = log((double)emissions_counts.count(0, emission_id) / all_emissions_counts[state_id]);
+				(*(_B[state_id]))[symbol] = log(emissions_counts.score(0, emission_id) / all_emissions_counts[state_id]);
 			}
 		}
 	}
