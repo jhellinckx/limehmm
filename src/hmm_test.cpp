@@ -248,6 +248,14 @@ int main(){
 		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
 		double precomputed_improvement_no_pseudocount = 84.9318;
 		double precomputed_improvement_with_pseudocount = 78.9441;
+		std::vector<double> precomputed_observation_likelihood = 
+		{-0.505202786679,-0.505202786679,-4.85332533917,-5.86447364745,-0.505202786679,-0.505202786679,
+		-4.77279340553,-8.94719166767,-5.71623676018,-7.35302419896,-3.61187131339,-7.35302419896,
+		-7.35302419896,-7.35302419896,-7.35302419896,-7.35302419896,-7.35302419896,-0.505202786679,
+		-0.505202786679,-7.35302419896,-0.505202786679,-7.35302419896,-7.35302419896,-7.35302419896,
+		-7.35302419896};
+		for(double& likelihood : precomputed_observation_likelihood){ likelihood = utils::round_double(likelihood); }
+		std::vector<std::vector<std::string>>& profile_observation_likelihood_sequences = profile_training_sequences;
 
 
 		tests_init();
@@ -557,16 +565,30 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"likelihood",
+			"observation likelihood (2 states casino)",
 			/* Same model as fwd/bwd. */
 			HiddenMarkovModel hmm = casino_hmm;
 			/* Test likelihood with forward algorithm. */
-			double forward_likelihood = utils::round_double(hmm.likelihood(casino_symbols), 4);
-			ASSERT(forward_likelihood == casino_precomputed_likelihood);
+			double forward_observation_likelihood = utils::round_double(hmm.likelihood(casino_symbols), 4);
+			ASSERT(forward_observation_likelihood == casino_precomputed_likelihood);
 			/* Test likelihood with backward algorithm. */
-			double backward_likelihood = utils::round_double(hmm.likelihood(casino_symbols, false), 4);
-			ASSERT(backward_likelihood == casino_precomputed_likelihood);
+			double backward_observation_likelihood = utils::round_double(hmm.likelihood(casino_symbols, false), 4);
+			ASSERT(backward_observation_likelihood == casino_precomputed_likelihood);
 		)
+
+		TEST_UNIT(
+			"observation likelihood (10 states profile hmm",
+				HiddenMarkovModel hmm = profile_10_states_hmm;
+				for(std::size_t i = 0; i < profile_observation_likelihood_sequences.size(); ++i){
+					const std::vector<std::string>& seq = profile_observation_likelihood_sequences[i];
+					//double forward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq));
+					//ASSERT(forward_observation_likelihood == precomputed_observation_likelihood[i]);
+					double backward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq,false));
+					ASSERT(backward_observation_likelihood == precomputed_observation_likelihood[i]);
+					//std::cout << backward_observation_likelihood << " =?= " << precomputed_observation_likelihood[i] << std::endl;
+				}
+		)
+		return 0;
 
 		TEST_UNIT(
 			"viterbi decode (2 states casino)",
@@ -625,17 +647,18 @@ int main(){
 
 		/* https://github.com/jmschrei/pomegranate/blob/master/tests/test_hmm_training.py */
 		TEST_UNIT(
-			"train viterbi with pseudocounts and with silent states",
+			"viterbi training with pseudocounts and with silent states",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences, 1.0), 4);
 			ASSERT(viterbi_improvement == precomputed_improvement_with_pseudocount);
 		)
 
-		/* Train B-W */
+		/* Train Baum-Welch */
+
 
 		/* Test fix / free parameters */
 
-		
+		/* Test update from raw model */
 
 		/* Train stochastic EM */
 

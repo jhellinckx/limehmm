@@ -113,6 +113,15 @@ std::string print_pi_end(const std::vector<double>& pi, const std::vector<std::s
 	return oss.str();
 }
 
+std::string print_prob(const std::vector<double>& probs, bool log_prob=false){
+	std::ostringstream oss;
+	for(double d : probs){
+		if(log_prob){oss << d << " ";}
+		else oss << exp(d) << " ";
+	}
+	return oss.str();
+}
+
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
 	for(double d : vec){
 		out << exp(d) << " ";
@@ -751,7 +760,7 @@ public:
 			if(_is_finite){
 				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 					beta_T[i] = _pi_end[i];
-					for(std::size_t j = _A.size(); j > i; --j){
+					for(std::size_t j = _A.size() - 1; j > i; --j){
 						beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]);
 					}
 				}
@@ -803,6 +812,7 @@ public:
 		if(sequence.size() == 0) throw std::runtime_error("backward on empty sequence");
 		else{
 			std::vector<double> beta = backward_init();
+			std::cout << "INIT : " << print_prob(beta, true) << std::endl;
 			for(std::size_t t = sequence.size() - 2; t >= t_min && t < sequence.size(); --t){
 				beta = backward_step(beta, t);
 			}
@@ -1552,6 +1562,7 @@ public:
 
 	void train_baum_welch(const std::vector<std::vector<std::string>>& sequences) {
 		
+
 	}
 
 	void train_stochastic_em() {
