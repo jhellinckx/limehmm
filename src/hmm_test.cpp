@@ -579,16 +579,17 @@ int main(){
 		TEST_UNIT(
 			"observation likelihood (10 states profile hmm",
 				HiddenMarkovModel hmm = profile_10_states_hmm;
-				for(std::size_t i = 0; i < profile_observation_likelihood_sequences.size(); ++i){
-					const std::vector<std::string>& seq = profile_observation_likelihood_sequences[i];
-					//double forward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq));
-					//ASSERT(forward_observation_likelihood == precomputed_observation_likelihood[i]);
+				std::size_t n_tests = 2;
+				/* Randomly choose n_tests sequences. Useless to test all 25 sequences. */
+				for(std::size_t i = 0; i < n_tests; ++i){
+					std::size_t random_sequence = (std::size_t)rand() % profile_observation_likelihood_sequences.size();	
+					const std::vector<std::string>& seq = profile_observation_likelihood_sequences[random_sequence];
+					double forward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq));
+					ASSERT(forward_observation_likelihood == precomputed_observation_likelihood[random_sequence]);
 					double backward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq,false));
-					ASSERT(backward_observation_likelihood == precomputed_observation_likelihood[i]);
-					//std::cout << backward_observation_likelihood << " =?= " << precomputed_observation_likelihood[i] << std::endl;
+					ASSERT(backward_observation_likelihood == precomputed_observation_likelihood[random_sequence]);
 				}
 		)
-		return 0;
 
 		TEST_UNIT(
 			"viterbi decode (2 states casino)",
@@ -631,9 +632,11 @@ int main(){
 			ASSERT(seq2_viterbi_path == profile_seq2_viterbi_path_precomputed);
 			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
 			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
-			for(std::size_t i = 0; i < precomputed_viterbi_log_likelihoods.size() ; ++i){
-				double viterbi_log_likelihood = utils::round_double(hmm.decode(profile_viterbi_decode_sequences[i]).second);
-				ASSERT(viterbi_log_likelihood == precomputed_viterbi_log_likelihoods[i]);
+			std::size_t n_tests = 2;
+			for(std::size_t i = 0; i < n_tests ; ++i){
+				std::size_t random_sequence = (std::size_t)rand() % profile_viterbi_decode_sequences.size();
+				double viterbi_log_likelihood = utils::round_double(hmm.decode(profile_viterbi_decode_sequences[random_sequence]).second);
+				ASSERT(viterbi_log_likelihood == precomputed_viterbi_log_likelihoods[random_sequence]);
 			}
 		)
 

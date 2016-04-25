@@ -812,7 +812,6 @@ public:
 		if(sequence.size() == 0) throw std::runtime_error("backward on empty sequence");
 		else{
 			std::vector<double> beta = backward_init();
-			std::cout << "INIT : " << print_prob(beta, true) << std::endl;
 			for(std::size_t t = sequence.size() - 2; t >= t_min && t < sequence.size(); --t){
 				beta = backward_step(beta, t);
 			}
