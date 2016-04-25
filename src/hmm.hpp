@@ -755,69 +755,73 @@ public:
 	}
 
 	std::vector<double> backward(const std::vector<std::string>& sequence, std::size_t t_min = 0) {
-		auto backward_init = [this]() {
-			std::vector<double> beta_T(_A.size());
-			if(_is_finite){
-				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-					beta_T[i] = _pi_end[i];
-					for(std::size_t j = _A.size() - 1; j > i; --j){
-						beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]);
-					}
-				}
-				for(std::size_t i = 0; i < _silent_states_index; ++i){
-					beta_T[i] = _pi_end[i];
-					for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-						beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]); 
-					}
-				}
-			}
-			else{
-				for(std::size_t i = 0; i < _silent_states_index; ++i){
-					beta_T[i] = 0.0;
-				}
-				for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-					beta_T[i] = utils::kNegInf;
-				}
-			}
-			return beta_T;
-		};
-		auto backward_step = [&sequence, this](const std::vector<double>& beta_next_t, std::size_t t) -> std::vector<double> {
-			std::vector<double> beta_t(_A.size());
-			/* First pass over silent states, considering next step non-silent states. */
-			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-				beta_t[i] = utils::kNegInf;
-				for(std::size_t j = 0; j < _silent_states_index; j++){
-					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
-				}
-			}
-			/* Second pass over silent states, considering current step silent states. */
-			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-				for(std::size_t j = _silent_states_index; j < _A.size(); j++){
-					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
-				}
-			}
-			/* Finally pass over non-silent states. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				beta_t[i] = utils::kNegInf;
-				for(std::size_t j = 0; j < _silent_states_index; ++j){
-					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
-				}
-				for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-					beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
-				}
-			}
-			return beta_t;
-		};
 		if(t_min > 0) --t_min;
 		if(sequence.size() == 0) throw std::runtime_error("backward on empty sequence");
 		else{
 			std::vector<double> beta = backward_init();
 			for(std::size_t t = sequence.size() - 2; t >= t_min && t < sequence.size(); --t){
-				beta = backward_step(beta, t);
+				beta = backward_step(beta, sequence, t);
 			}
 			return beta;
 		}
 	}
+
+	std::vector<double> backward_init() {
+		std::vector<double> beta_T(_A.size());
+		if(_is_finite){
+			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+				beta_T[i] = _pi_end[i];
+				for(std::size_t j = _A.size() - 1; j > i; --j){
+					beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]);
+				}
+			}
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				beta_T[i] = _pi_end[i];
+				for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+					beta_T[i] = utils::sum_log_prob(beta_T[i], _A[i][j] + beta_T[j]); 
+				}
+			}
+		}
+		else{
+			for(std::size_t i = 0; i < _silent_states_index; ++i){
+				beta_T[i] = 0.0;
+			}
+			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+				beta_T[i] = utils::kNegInf;
+			}
+		}
+		return beta_T;
+	};
+
+	std::vector<double> backward_step(const std::vector<double>& beta_next_t, const std::vector<std::string>& sequence, std::size_t t) {
+		std::vector<double> beta_t(_A.size());
+		/* First pass over silent states, considering next step non-silent states. */
+		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+			beta_t[i] = utils::kNegInf;
+			for(std::size_t j = 0; j < _silent_states_index; j++){
+				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
+			}
+		}
+		/* Second pass over silent states, considering current step silent states. */
+		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+			for(std::size_t j = _silent_states_index; j < _A.size(); j++){
+				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
+			}
+		}
+		/* Finally pass over non-silent states. */
+		for(std::size_t i = 0; i < _silent_states_index; ++i){
+			beta_t[i] = utils::kNegInf;
+			for(std::size_t j = 0; j < _silent_states_index; ++j){
+				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
+			}
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
+			}
+		}
+		return beta_t;
+	};
+
+
 
 	std::pair<std::vector<double>, double> backward_terminate(const std::vector<double>& beta_0, const std::vector<std::string>& sequence){
 		std::vector<double> beta_end(_A.size());
@@ -1122,136 +1126,125 @@ public:
 		return (unsigned int)(i == j);
 	}
 
-	class TransitionCount{
-		std::vector<std::vector<unsigned int>> _transitions_counts;
-		std::vector<std::vector<unsigned int>> _pi_begin_counts;
-		std::vector<std::vector<unsigned int>> _pi_end_counts;
+	/* Test wether a transition from i to j occurs in the given traceback.
+		This method should only return 0 or 1. */
+	static unsigned int any_of_transitions(const std::vector<std::size_t>& traceback, std::size_t i, std::size_t j){
+		unsigned int delta_sum = 0;
+		for(std::size_t l = 0; l < traceback.size() - 1; ++l){
+			delta_sum += delta(traceback[l], i) * delta(traceback[l+1], j);
+		}
+		return delta_sum;
+	}
+
+	class TransitionScore{
+		std::vector<std::vector<double>> _transitions_scores;
+		std::vector<std::vector<double>> _pi_begin_scores;
+		std::vector<std::vector<double>> _pi_end_scores;
 		const std::vector<std::pair<std::size_t, std::size_t>>* _free_transitions;
 		const std::vector<std::size_t>* _free_pi_begin;
 		const std::vector<std::size_t>* _free_pi_end;
 	public:
-		TransitionCount(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions,
+		TransitionScore(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions,
 			const std::vector<std::size_t>& free_pi_begin,
 			const std::vector<std::size_t>& free_pi_end,
 			std::size_t num_states) :
-				_transitions_counts(num_states, std::vector<unsigned int>(free_transitions.size(), 0)),
-				_pi_begin_counts(num_states, std::vector<unsigned int>(free_pi_begin.size(), 0)), 
-				_pi_end_counts(num_states, std::vector<unsigned int>(free_pi_end.size(), 0)),
+				_transitions_scores(num_states, std::vector<double>(free_transitions.size(), 0.0)),
+				_pi_begin_scores(num_states, std::vector<double>(free_pi_begin.size(), 0.0)), 
+				_pi_end_scores(num_states, std::vector<double>(free_pi_end.size(), 0.0)),
 				_free_transitions(&free_transitions),
 				_free_pi_begin(&free_pi_begin),
 				_free_pi_end(&free_pi_end) {}
 
-		/* /!\ Both transition counts need to represent the same hmm in a given training !! */
-		TransitionCount& operator=(const TransitionCount& other) {
+		/* /!\ Both transition scores need to represent the same hmm in a given training !! */
+		TransitionScore& operator=(const TransitionScore& other) {
 			if(this != &other){
-				for(std::size_t m = 0; m < _transitions_counts.size(); ++m){
-					for(std::size_t id = 0; id < _transitions_counts[m].size(); ++id){
-						_transitions_counts[m][id] = other._transitions_counts[m][id];
+				for(std::size_t m = 0; m < _transitions_scores.size(); ++m){
+					for(std::size_t id = 0; id < _transitions_scores[m].size(); ++id){
+						_transitions_scores[m][id] = other._transitions_scores[m][id];
 					}
-					for(std::size_t id = 0; id < _pi_begin_counts[m].size(); ++id){
-						_pi_begin_counts[m][id] = other._pi_begin_counts[m][id];
+					for(std::size_t id = 0; id < _pi_begin_scores[m].size(); ++id){
+						_pi_begin_scores[m][id] = other._pi_begin_scores[m][id];
 					}
-					for(std::size_t id = 0; id < _pi_end_counts[m].size(); ++id){
-						_pi_end_counts[m][id] = other._pi_end_counts[m][id];
+					for(std::size_t id = 0; id < _pi_end_scores[m].size(); ++id){
+						_pi_end_scores[m][id] = other._pi_end_scores[m][id];
 					}
 				}	
 			}
 			return *this;
 		}
 
-		void add(const TransitionCount& other, std::size_t m, std::size_t l){
-			for(std::size_t id = 0; id < _transitions_counts[m].size(); ++id){
-				_transitions_counts[m][id] += other._transitions_counts[l][id];
+		void add(const TransitionScore& other, std::size_t m, std::size_t l){
+			for(std::size_t id = 0; id < _transitions_scores[m].size(); ++id){
+				_transitions_scores[m][id] += other._transitions_scores[l][id];
 			}
-			for(std::size_t id = 0; id < _pi_begin_counts[m].size(); ++id){
-				_pi_begin_counts[m][id] += other._pi_begin_counts[l][id];
+			for(std::size_t id = 0; id < _pi_begin_scores[m].size(); ++id){
+				_pi_begin_scores[m][id] += other._pi_begin_scores[l][id];
 			}
-			for(std::size_t id = 0; id < _pi_end_counts[m].size(); ++id){
-				_pi_end_counts[m][id] += other._pi_end_counts[l][id];
-			}
-		}
-
-		/* Returns the transitions count of given transition for a path finishing at state m. */
-		unsigned int count(std::size_t m, std::size_t free_transition_id) const {
-			return _transitions_counts[m][free_transition_id];
-		}
-
-		unsigned int count_begin(std::size_t m, std::size_t free_transition_id) const {
-			return _pi_begin_counts[m][free_transition_id];
-		}
-
-		unsigned int count_end(std::size_t m, std::size_t begin_transition_id) const {
-			return _pi_end_counts[m][begin_transition_id];
-		}
-
-		/* Test wether a transition from i to j occurs in the given traceback.
-		This method should only return 0 or 1. */
-		unsigned int any_of_transitions(const std::vector<std::size_t>& traceback, std::size_t i, std::size_t j){
-			unsigned int delta_sum = 0;
-			for(std::size_t l = 0; l < traceback.size() - 1; ++l){
-				delta_sum += delta(traceback[l], i) * delta(traceback[l+1], j);
-			}
-			return delta_sum;
-		}
-
-		/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
-		counts for paths finishing at l and increments it if i == l and j == m. */
-		void update(const TransitionCount& previous_counts, const std::vector<std::size_t>& traceback){
-			if(traceback.size() >= 2) {
-				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
-				std::size_t i,j;
-				copy_begin(previous_counts, l, m);
-				for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
-					i = (*_free_transitions)[free_transition_id].first;
-					j = (*_free_transitions)[free_transition_id].second;
-					_transitions_counts[m][free_transition_id] = previous_counts.count(l, free_transition_id) + any_of_transitions(traceback, i, j);
-				}	
+			for(std::size_t id = 0; id < _pi_end_scores[m].size(); ++id){
+				_pi_end_scores[m][id] += other._pi_end_scores[l][id];
 			}
 		}
 
-		void copy_begin(const TransitionCount& previous_counts, std::size_t l, std::size_t m){
-			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
-				_pi_begin_counts[m][begin_transition_id] = previous_counts.count_begin(l, begin_transition_id); 
+		/* Returns the transitions score of given transition for a path finishing at state m. */
+		double score(std::size_t m, std::size_t free_transition_id) const {
+			return _transitions_scores[m][free_transition_id];
+		}
+
+		double score_begin(std::size_t m, std::size_t free_transition_id) const {
+			return _pi_begin_scores[m][free_transition_id];
+		}
+
+		double score_end(std::size_t m, std::size_t end_transition_id) const {
+			return _pi_end_scores[m][end_transition_id];
+		}
+
+		std::size_t num_free_transitions() const { return _free_transitions->size(); }
+		std::size_t num_free_begin_transitions() const { return _free_pi_begin->size(); }
+		std::size_t num_free_end_transitions() const { return _free_pi_end->size(); }
+
+		void set_begin_score(std::size_t m, std::size_t free_begin_transition_id, double score){
+			_pi_begin_scores[m][free_begin_transition_id] = score;
+		}
+
+		void set_score(std::size_t m, std::size_t free_transition_id, double score){
+			_transitions_scores[m][free_transition_id] = score;
+		}
+		void set_end_score(std::size_t m, std::size_t free_end_transition_id, double score){
+			_pi_end_scores[m][free_end_transition_id] = score;
+		}
+
+		void copy_begin(const TransitionScore& other, std::size_t l, std::size_t m){
+			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_scores[m].size(); ++begin_transition_id){
+				_pi_begin_scores[m][begin_transition_id] = other.score_begin(l, begin_transition_id); 
 			}
 		}
 
-		void update_begin(const std::vector<std::size_t>& traceback){
-			if(!traceback.empty()){
-				std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
-				std::size_t i,j;
-				for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
-					j = (*_free_pi_begin)[begin_transition_id];
-					_pi_begin_counts[m][begin_transition_id] = delta(l, j); 
-				}
-				if(traceback.size() >= 2){
-					for(std::size_t free_transition_id = 0; free_transition_id < _transitions_counts[m].size(); ++free_transition_id){
-						i = (*_free_transitions)[free_transition_id].first;
-						j = (*_free_transitions)[free_transition_id].second;
-						_transitions_counts[m][free_transition_id] = any_of_transitions(traceback, i, j);
-					}
-				}
-			}
+		std::size_t get_from_state_id(std::size_t free_transition_id){
+			return (*_free_transitions)[free_transition_id].first;
 		}
 
-		/* Adds 1 to the end transition count of state_id for path arriving at state_id. */
-		void update_end(std::size_t state_id){
-			for(std::size_t end_transition_id = 0; end_transition_id < _pi_end_counts[state_id].size(); ++end_transition_id){
-				if((*_free_pi_end)[end_transition_id] == state_id){
-					_pi_end_counts[state_id][end_transition_id] += 1;
-				}
-			}
+		std::size_t get_to_state_id(std::size_t free_transition_id){
+			return (*_free_transitions)[free_transition_id].second;	
+		}
+
+		std::size_t get_state_id_from_begin(std::size_t free_begin_transition_id){
+			return (*_free_pi_begin)[free_begin_transition_id];
+		}
+
+		std::size_t get_state_id_to_end(std::size_t free_end_transition_id){
+			return (*_free_pi_end)[free_end_transition_id];
 		}
 
 		void reset(){
-			for(std::size_t m = 0; m < _transitions_counts.size(); ++m){
-				for(std::size_t id = 0; id < _transitions_counts[m].size(); ++id){
-					_transitions_counts[m][id] = 0;
+			for(std::size_t m = 0; m < _transitions_scores.size(); ++m){
+				for(std::size_t id = 0; id < _transitions_scores[m].size(); ++id){
+					_transitions_scores[m][id] = 0;
 				}
-				for(std::size_t id = 0; id < _pi_begin_counts[m].size(); ++id){
-					_pi_begin_counts[m][id] = 0;
+				for(std::size_t id = 0; id < _pi_begin_scores[m].size(); ++id){
+					_pi_begin_scores[m][id] = 0;
 				}
-				for(std::size_t id = 0; id < _pi_end_counts[m].size(); ++id){
-					_pi_end_counts[m][id] = 0;
+				for(std::size_t id = 0; id < _pi_end_scores[m].size(); ++id){
+					_pi_end_scores[m][id] = 0;
 				}
 			}
 		}
@@ -1260,18 +1253,18 @@ public:
 			std::ostringstream oss;
 			std::string name = from.empty() ? names[m] : from;
 			oss << "From state " << name << std::endl;
-			oss << "Begin counts : " << std::endl;
-			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_counts[m].size(); ++begin_transition_id){
-				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << _pi_begin_counts[m][begin_transition_id] << ") "; 
+			oss << "Begin scores : " << std::endl;
+			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_scores[m].size(); ++begin_transition_id){
+				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << _pi_begin_scores[m][begin_transition_id] << ") "; 
 			}
-			oss << std::endl << "Mid counts : " << std::endl;
-			for(std::size_t transition_id = 0; transition_id < _transitions_counts[m].size(); ++transition_id){
+			oss << std::endl << "Mid scores : " << std::endl;
+			for(std::size_t transition_id = 0; transition_id < _transitions_scores[m].size(); ++transition_id){
 				oss << "(" << names[(*_free_transitions)[transition_id].first] << "->" << 
-				names[(*_free_transitions)[transition_id].second] << " = " << _transitions_counts[m][transition_id] << ") "; 
+				names[(*_free_transitions)[transition_id].second] << " = " << _transitions_scores[m][transition_id] << ") "; 
 			}
-			oss << std::endl << "End counts : " << std::endl;
-			for(std::size_t end_transition_id = 0; end_transition_id < _pi_end_counts[m].size(); ++end_transition_id){
-				oss << "(" << names[(*_free_pi_end)[end_transition_id]] << " = " << _pi_end_counts[m][end_transition_id] << ") "; 
+			oss << std::endl << "End scores : " << std::endl;
+			for(std::size_t end_transition_id = 0; end_transition_id < _pi_end_scores[m].size(); ++end_transition_id){
+				oss << "(" << names[(*_free_pi_end)[end_transition_id]] << " = " << _pi_end_scores[m][end_transition_id] << ") "; 
 			}
 			oss << std::endl;
 			return oss.str();
@@ -1354,6 +1347,50 @@ public:
 		}
 	};
 
+	/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
+		counts for paths finishing at l and increments it if i == l and j == m. */
+	void update(const TransitionScore& previous_counts, TransitionScore& next_counts, const std::vector<std::size_t>& traceback){
+		if(traceback.size() >= 2) {
+			std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
+			std::size_t i,j;
+			next_counts.copy_begin(previous_counts, l, m);
+			for(std::size_t free_transition_id = 0; free_transition_id < next_counts.num_free_transitions(); ++free_transition_id){
+				i = next_counts.get_from_state_id(free_transition_id);
+				j = next_counts.get_to_state_id(free_transition_id);
+				next_counts.set_score(m, free_transition_id, previous_counts.score(l, free_transition_id) + any_of_transitions(traceback, i, j));
+			}	
+		}
+	}
+
+		
+
+	void update_begin(TransitionScore& counts, const std::vector<std::size_t>& traceback){
+		if(!traceback.empty()){
+			std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
+			std::size_t i,j;
+			for(std::size_t begin_transition_id = 0; begin_transition_id < counts.num_free_begin_transitions(); ++begin_transition_id){
+				j = counts.get_state_id_from_begin(begin_transition_id);
+				counts.set_begin_score(m, begin_transition_id, delta(l, j));
+			}
+			if(traceback.size() >= 2){
+				for(std::size_t free_transition_id = 0; free_transition_id < counts.num_free_transitions(); ++free_transition_id){
+					i = counts.get_from_state_id(free_transition_id);
+					j = counts.get_to_state_id(free_transition_id);
+					counts.set_score(m, free_transition_id, any_of_transitions(traceback, i, j));
+				}
+			}
+		}
+	}
+
+	/* Adds 1 to the end transition count of m for path arriving at m. */
+	void update_end(TransitionScore& counts, std::size_t m){
+		for(std::size_t end_transition_id = 0; end_transition_id < counts.num_free_end_transitions(); ++end_transition_id){
+			if(counts.get_state_id_to_end(end_transition_id) == m){
+				counts.set_end_score(m, end_transition_id, counts.score_end(m, end_transition_id) + 1.0);
+			}
+		}
+	}
+
 	double train_viterbi(const std::vector<std::vector<std::string>>& sequences, 
 		double transition_pseudocount = hmm_config::kDefaultTransitionPseudocount,
 		double convergence_threshold = hmm_config::kDefaultConvergenceThreshold,
@@ -1361,11 +1398,11 @@ public:
 		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi){
 
 		/* This holds all the counts for the batch of sequences. */
-		TransitionCount total_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, 1);
+		TransitionScore total_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, 1);
 		EmissionCount total_emission_count(_free_emissions, 1, 0);
 		/* This hold the counts for each sequence. */
-		TransitionCount previous_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		TransitionCount next_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
+		TransitionScore previous_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
+		TransitionScore next_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
 		EmissionCount previous_emission_count(_free_emissions, _A.size(), _silent_states_index);
 		EmissionCount next_emission_count(_free_emissions, _A.size(), _silent_states_index);
 		unsigned int iteration = 0;
@@ -1387,7 +1424,7 @@ public:
 				/* First iterate only on normal states since emission count are only needed for such states. */
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
-					next_transition_count.update_begin(traceback_m);
+					update_begin(next_transition_count, traceback_m);
 					next_emission_count.update(previous_emission_count, traceback_m, sequence[0]);
 				}
 				previous_transition_count = next_transition_count;
@@ -1399,7 +1436,7 @@ public:
 					phi = viterbi_step(phi, psi, k, sequence);
 					for(std::size_t m = 0; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
-						next_transition_count.update(previous_transition_count, traceback_m);
+						update(previous_transition_count, next_transition_count, traceback_m);
 						next_emission_count.update(previous_emission_count, traceback_m, sequence[k]);
 					}
 					psi.reset();
@@ -1411,7 +1448,7 @@ public:
 				if(max_state_index < _A.size()){
 					/* Add 1 to the end transition count of the max state index if model has end state. */
 					if(_is_finite){
-						next_transition_count.update_end(max_state_index);
+						update_end(next_transition_count, max_state_index);
 					}
 					/* Update the total counts. */
 					total_transition_count.add(next_transition_count, 0, max_state_index);
@@ -1423,6 +1460,7 @@ public:
 				next_emission_count.reset();
 				previous_emission_count.reset();
 			}
+			std::cout << total_transition_count.to_string(0, _states_names, "total") << std::endl;
 			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
 			total_transition_count.reset();
 			total_emission_count.reset();
@@ -1437,38 +1475,38 @@ public:
 		return current_likelihood - initial_likelihood;
 	}
 
-	void update_model_from_counts(const TransitionCount& transitions_counts, 
+	void update_model_from_counts(const TransitionScore& transitions_counts, 
 		const EmissionCount& emissions_counts, double transition_pseudocount){
 		update_model_transitions_from_counts(transitions_counts, transition_pseudocount);
 		update_model_emissions_from_counts(emissions_counts);
 	}
 
-	void update_model_transitions_from_counts(const TransitionCount& transitions_counts, double transition_pseudocount){
+	void update_model_transitions_from_counts(const TransitionScore& transitions_counts, double transition_pseudocount){
 		/* Update begin transitions. */
 		/* First, sum all the begin transitions counts. */
-		unsigned int begin_transitions_count = 0;
+		double begin_transitions_count = 0;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
-			begin_transitions_count += transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount;
+			begin_transitions_count += transitions_counts.score_begin(0, begin_transition_id) + transition_pseudocount;
 		}
 		/* Then, normalize the count of each begin transition by using the total count. */
 		std::size_t state_id;
 		for(std::size_t begin_transition_id = 0; begin_transition_id < _free_pi_begin.size(); ++begin_transition_id){
 			state_id = _free_pi_begin[begin_transition_id];
 			if(begin_transitions_count > 0){
-				_pi_begin[state_id] = log(((double)transitions_counts.count_begin(0, begin_transition_id) + transition_pseudocount) / begin_transitions_count);
+				_pi_begin[state_id] = log((transitions_counts.score_begin(0, begin_transition_id) + transition_pseudocount) / begin_transitions_count);
 			}
 		}
 
 		/* Update other transitions (don't forget to take end transitions into account). */
 		/* Similarly to begin transitions, sum, for each state, all its out transitions counts. */
-		std::unordered_map<std::size_t, unsigned int> out_transitions_counts;
+		std::unordered_map<std::size_t, double> out_transitions_counts;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			state_id = _free_transitions[transition_id].first;
 			/* If state i not yet in map, init count for state i at 0. */
 			if(out_transitions_counts.find(state_id) == out_transitions_counts.end()){
 				out_transitions_counts[state_id] = 0;
 			}
-			out_transitions_counts[state_id] += transitions_counts.count(0, transition_id) + transition_pseudocount;
+			out_transitions_counts[state_id] += transitions_counts.score(0, transition_id) + transition_pseudocount;
 		}
 		/* Also add end transitions counts to the the sum. */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
@@ -1476,21 +1514,21 @@ public:
 			if(out_transitions_counts.find(state_id) == out_transitions_counts.end()){
 				out_transitions_counts[state_id] = 0;
 			}
-			out_transitions_counts[state_id] += transitions_counts.count_end(0, end_transition_id) + transition_pseudocount;
+			out_transitions_counts[state_id] += transitions_counts.score_end(0, end_transition_id) + transition_pseudocount;
 		}
 		/* Normalize each transition by using the sum. */
 		std::size_t from_state, to_state;
 		for(std::size_t transition_id = 0; transition_id < _free_transitions.size(); ++transition_id){
 			from_state = _free_transitions[transition_id].first; to_state = _free_transitions[transition_id].second;
 			if(out_transitions_counts[from_state] > 0){
-				_A[from_state][to_state] =  log(((double)transitions_counts.count(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
+				_A[from_state][to_state] =  log((transitions_counts.score(0, transition_id) + transition_pseudocount) / out_transitions_counts[from_state]);
 			}
 		}
 		/* Don't forget to update the end transitions ! */
 		for(std::size_t end_transition_id = 0; end_transition_id < _free_pi_end.size(); ++end_transition_id){
 			state_id = _free_pi_end[end_transition_id];
 			if(out_transitions_counts[state_id] > 0){
-				_pi_end[state_id] = log(((double)transitions_counts.count_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
+				_pi_end[state_id] = log((transitions_counts.score_end(0, end_transition_id) + transition_pseudocount) / out_transitions_counts[state_id]);
 			}
 		}
 	}
@@ -1559,8 +1597,11 @@ public:
 
 
 
+
 	void train_baum_welch(const std::vector<std::vector<std::string>>& sequences) {
-		
+		/* Initialization. */
+		std::vector<double> beta_T = backward_init();
+
 
 	}
 
