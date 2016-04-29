@@ -1625,8 +1625,8 @@ public:
 		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
 		EmissionScore previous_emission_score(_free_emissions, _A.size());
 		EmissionScore next_emission_score(_free_emissions, _A.size());
+		
 		unsigned int iteration = 0;
-		/* Use likelihood to determine convergence. */
 		double delta = utils::kInf;
 		double initial_likelihood = log_likelihood(sequences);
 		double previous_likelihood = initial_likelihood;
@@ -1637,8 +1637,31 @@ public:
 			for(const std::vector<std::string>& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
-				
-				/* Reset counts. */
+				std::string gamma;
+				std::size_t state_id, i, j;
+				std::vector<double> beta = backward_init();
+				for(std::size_t m = 0; m < _A.size(); ++m){
+					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
+						state_id = next_emission_score.get_state_id(free_emission_id);
+						gamma = next_emission_score.get_symbol(free_emission_id);
+						next_emission_score.score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
+					}
+				}
+				std::vector<double> previous_beta = beta;
+				for(std::size_t t = sequence.size() - 1; t >= 1; --t){
+					beta = backward_step(previous_beta, sequence, t);
+					for(std::size_t m = 0; m < _A.size(); ++m){
+						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
+							i = next_transition_score.get_from_state_id(free_transition_id);
+							j = next_transition_score.get_to_state_id(free_transition_id);
+							next_transition_score.set_score(previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t]] + delta(i, m)) ;
+						}
+					}
+
+					previous_beta = beta;
+				}			
+
+
 				next_transition_score.reset();
 				previous_transition_score.reset();
 				next_emission_score.reset();
