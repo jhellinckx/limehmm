@@ -23,7 +23,7 @@
 template<typename Elem>
 using Matrix = std::vector<std::vector<Elem>>;
 
-std::string print_transitions(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
+void print_transitions(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
 	std::size_t longest_string = 0;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
@@ -55,10 +55,10 @@ std::string print_transitions(const Matrix<double>& matrix, const std::map<std::
 		}
 		out << std::endl;
 	}
-	return out.str();	
+	std::cout << out << std::endl;
 }
 
-std::string print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=false){
+void print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=false){
 	std::ostringstream oss;
 	for(std::size_t state_id = 0; state_id < dists.size(); ++state_id){
 		Distribution* dist = dists[state_id];
@@ -73,21 +73,20 @@ std::string print_distributions(const std::vector<Distribution*>& dists, const s
 		
 		oss << std::endl;
 	}
-	return oss.str();
+	std::cout << oss << std::endl;
 }
 
-std::string print_names(const std::vector<std::size_t>& ids, const std::vector<std::string>& names){
+void print_names(const std::vector<std::size_t>& ids, const std::vector<std::string>& names){
 	std::ostringstream oss;
 	for(std::size_t id : ids){
 		if(id < names.size()){
 			oss << names[id] << " ";
 		}
 	}
-	oss << std::endl;
-	return oss.str();
+	std::cout << oss << std::endl;
 }
 
-std::string print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
 	std::ostringstream oss;
 	oss << "Pi begin : ";
 	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
@@ -96,11 +95,10 @@ std::string print_pi_begin(const std::vector<double>& pi, const std::vector<std:
 		else oss << exp(pi[state_id]);
 		oss << ") ";
 	}
-	oss << std::endl;
-	return oss.str();
+	std::cout << oss << std::endl;
 }
 
-std::string print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
 	std::ostringstream oss;
 	oss << "Pi end : ";
 	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
@@ -110,16 +108,16 @@ std::string print_pi_end(const std::vector<double>& pi, const std::vector<std::s
 		oss << ") ";
 	}
 	oss << std::endl;
-	return oss.str();
+	std::cout << oss << std::endl;
 }
 
-std::string print_prob(const std::vector<double>& probs, bool log_prob=false){
+void print_prob(const std::vector<double>& probs, bool log_prob=false){
 	std::ostringstream oss;
 	for(double d : probs){
 		if(log_prob){oss << d << " ";}
 		else oss << exp(d) << " ";
 	}
-	return oss.str();
+	std::cout << oss << std::endl;
 }
 
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
@@ -1481,7 +1479,7 @@ public:
 				next_emission_count.reset();
 				previous_emission_count.reset();
 			}
-			update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			update_model_from_scores(total_transition_count, total_emission_count, transition_pseudocount);
 			total_transition_count.reset();
 			total_emission_count.reset();
 			current_likelihood = log_likelihood(sequences);
@@ -1495,13 +1493,13 @@ public:
 		return current_likelihood - initial_likelihood;
 	}
 
-	void update_model_from_counts(const TransitionScore& transitions_counts, 
-		const EmissionScore& emissions_counts, double transition_pseudocount){
-		update_model_transitions_from_counts(transitions_counts, transition_pseudocount);
-		update_model_emissions_from_counts(emissions_counts);
+	void update_model_from_scores(const TransitionScore& transitions_scores, 
+		const EmissionScore& emissions_scores, double transition_pseudocount){
+		update_model_transitions_from_scores(transitions_scores, transition_pseudocount);
+		update_model_emissions_from_scores(emissions_scores);
 	}
 
-	void update_model_transitions_from_counts(const TransitionScore& transitions_counts, double transition_pseudocount){
+	void update_model_transitions_from_scores(const TransitionScore& transitions_counts, double transition_pseudocount){
 		/* Update begin transitions. */
 		/* First, sum all the begin transitions counts. */
 		double begin_transitions_count = 0;
@@ -1553,7 +1551,7 @@ public:
 		}
 	}
 
-	void update_model_emissions_from_counts(const EmissionScore& emissions_counts){
+	void update_model_emissions_from_scores(const EmissionScore& emissions_counts){
 		std::unordered_map<std::size_t, double> all_emissions_counts;
 		std::size_t state_id;
 		for(std::size_t emission_id = 0; emission_id < _free_emissions.size(); ++emission_id){
@@ -1632,8 +1630,8 @@ public:
 		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi, 
 		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi){
 
-		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1, utils::kNegInf);
-		EmissionScore total_emission_score(_free_emissions, 1, utils::kNegInf);
+		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1, 0);
+		EmissionScore total_emission_score(_free_emissions, 1, 0);
 
 		TransitionScore previous_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
 		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
@@ -1664,6 +1662,10 @@ public:
 						gamma = next_emission_score.get_symbol(free_emission_id);
 						next_emission_score.set_score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
 					}
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						state_id = next_transition_count.get_state_id_to_end(free_end_transition_id);
+						next_transition_count.set_end_score(m, free_end_transition_id, beta[state_id]);
+					}
 				}
 				previous_beta = beta;
 				previous_transition_score = next_transition_score; 
@@ -1691,6 +1693,20 @@ public:
 							}
 							next_transition_score.set_score(m, free_transition_id, score);
 						}
+						/* Compute end transitions scores. */
+						for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+							state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+							score = utils::kNegInf;
+							/* Consider next step non-silent states. */
+							for(std::size_t l = 0; l < _silent_states_index; ++l){
+								score = utils::sum_log_prob(score, previous_transition_score.score_end(l, free_end_transition_id) + _A[m][l] + (*_B[l])[sequence[t + 1]]);
+							}
+							/* Consider current step silent states. */
+							for(std::size_t l = std::max(m, _silent_states_index); l < _A.size(); ++l){
+								score = utils::sum_log_prob(score,  next_transition_score.score_end(l, free_end_transition_id) + _A[m][l]);
+							}
+							next_transition_score.set_end_score(m, free_end_transition_id, score);
+						}
 						/* Compute emissions score for current step. */
 						for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
 							state_id = next_emission_score.get_state_id(free_emission_id);
@@ -1711,14 +1727,49 @@ public:
 					previous_transition_score = next_transition_score;
 					previous_emission_score = next_emission_score;
 				}
-				alpha_1 = forward_init()
+				alpha_1 = forward_init(sequence);
+
+				/* Update total scores. */
+				/* Begin transitions. */
+				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < next_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
+					state_id = next_transition_score.get_state_id_from_begin(free_begin_transition_id);
+					score = alpha_1[state_id] + beta[state_id];
+					total_transition_score.set_begin_score(0, free_begin_transition_id, total_transition_score.score_begin(0, free_begin_transition_id) + exp(score));
+				}
+
+				/* Mid transitions. */
+				for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
+					score = utils::kNegInf;
+					for(std::size_t m = _A.size(); m-- > 0;){
+						score = utils::sum_log_prob(score, previous_transition_score.score(m, free_transition_id) + alpha_1[m]);
+					}
+					total_transition_score.set_score(0, free_transition_id, total_transition_score.score(0, free_transition_id) + exp(score));
+				}
+				
+				/* End transitions. */
+				for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+					score = utils::kNegInf;
+					for(std::size_t m = _A.size(); m-- > 0;){
+						score = utils::sum_log_prob(score, previous_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
+					}
+					total_transition_score.set_end_score(0, free_end_transition_id, total_transition_score.score_end(0, free_end_transition_id) + exp(score));
+				}
+
+				/* Emissions. */
+				for(std::size_t free_emission_id = 0; free_emission_id < next_transition_score.num_free_transitions(); ++free_emission_id){
+					score = utils::kNegInf;
+					for(std::size_t m = _A.size(); m-- > 0;){
+						score = utils::sum_log_prob(score, previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
+					}
+					total_emission_score.set_score(0, free_emission_id, total_emission_score.score(0, free_emission_id) +  exp(score));
+				}
 
 				next_transition_score.reset();
 				previous_transition_score.reset();
 				next_emission_score.reset();
 				previous_emission_score.reset();
 			}
-			//update_model_from_counts(total_transition_count, total_emission_count, transition_pseudocount);
+			update_model_from_scores(total_transition_score, total_emission_score, transition_pseudocount);
 			total_transition_score.reset();
 			total_emission_score.reset();
 			current_likelihood = log_likelihood(sequences);

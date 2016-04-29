@@ -134,14 +134,16 @@ int main(){
 		double casino_precomputed_likelihood = 0.0028;
 		std::vector<std::string> casino_precomputed_viterbi_path_2_states({"fair", "fair", "fair", "fair", "fair", "fair", "fair", "fair"});
 		/* Training casino. */
-		std::vector<std::vector<std::string>> casino_training_symbols = 
+		std::vector<std::vector<std::string>> casino_training_sequences = 
 		{{"H", "T", "H"}, {"H", "H", "H", "H"}, {"T", "H", "T", "H", "T"}, 
 		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
 		{"T", "T", "H", "H", "H", "H", "H", "H", "H", "H", "H"}, 
 		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
 		{"T", "T", "T"}};	
-		double precomputed_casino_improvement_no_pseudocount = utils::round_double(0.639841864861836, 4);
-		double precomputed_casino_improvement_with_pseudocount = utils::round_double(1.7764802457455673, 4);
+		double precomputed_casino_viterbi_improvement_no_pseudocount = utils::round_double(0.639841864861836, 4);
+		double precomputed_casino_viterbi_improvement_with_pseudocount = utils::round_double(1.7764802457455673, 4);
+
+		double precomputed_casino_bw_improvement_no_pseudocount = utils::round_double(2.6887270225223574);
 
 		/* Simple hmm with 3 states emitting nucleobases. Not normalized. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
@@ -650,21 +652,21 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi training without pseudocounts and without silent states (casino)",
+			"viterbi training (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_symbols), 4);
-			ASSERT(viterbi_improvement == precomputed_casino_improvement_no_pseudocount);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences), 4);
+			ASSERT(viterbi_improvement == precomputed_casino_viterbi_improvement_no_pseudocount);
 		)
 
 		TEST_UNIT(
-			"viterbi training with pseudocounts and without silent states (casino)",
+			"viterbi training with pseudocounts (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_symbols, 1.0), 4);
-			ASSERT(viterbi_improvement == precomputed_casino_improvement_with_pseudocount);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences, 1.0), 4);
+			ASSERT(viterbi_improvement == precomputed_casino_viterbi_improvement_with_pseudocount);
 		)
 
 		TEST_UNIT(
-			"viterbi training without pseudocounts and with silent states (profile hmm)",
+			"viterbi training with silent states (profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_no_pseudocount);
@@ -678,6 +680,14 @@ int main(){
 		)
 
 		/* Train Baum-Welch */
+		TEST_UNIT(
+			"baum-welch training (casino)",
+			HiddenMarkovModel hmm = casino_hmm;
+			double baum_welch_improvement = utils::round_double(hmm.train_baum_welch(casino_training_sequences));
+			std::cout << "EXPECTED : " << precomputed_casino_bw_improvement_no_pseudocount << std::endl;
+			std::cout << "GOT : " << baum_welch_improvement << std::endl;
+		)
+
 
 
 		/* Test fix / free parameters */
@@ -686,17 +696,11 @@ int main(){
 
 		/* Train stochastic EM */
 
-		/* Test tied distributions */
+		/* Profile HMM */
 
 		/* MLE */
 
 		/* Randomized params */
-
-		/* Profile HMM */
-
-		/* Pair HMM */
-	
-		/* Sample */
 
 		tests_results();
 
