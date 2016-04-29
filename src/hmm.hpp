@@ -55,7 +55,7 @@ void print_transitions(const Matrix<double>& matrix, const std::map<std::string,
 		}
 		out << std::endl;
 	}
-	std::cout << out << std::endl;
+	std::cout << out.str() << std::endl;
 }
 
 void print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=false){
@@ -73,7 +73,7 @@ void print_distributions(const std::vector<Distribution*>& dists, const std::vec
 		
 		oss << std::endl;
 	}
-	std::cout << oss << std::endl;
+	std::cout << oss.str() << std::endl;
 }
 
 void print_names(const std::vector<std::size_t>& ids, const std::vector<std::string>& names){
@@ -83,7 +83,7 @@ void print_names(const std::vector<std::size_t>& ids, const std::vector<std::str
 			oss << names[id] << " ";
 		}
 	}
-	std::cout << oss << std::endl;
+	std::cout << oss.str() << std::endl;
 }
 
 void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
@@ -95,7 +95,7 @@ void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string
 		else oss << exp(pi[state_id]);
 		oss << ") ";
 	}
-	std::cout << oss << std::endl;
+	std::cout << oss.str() << std::endl;
 }
 
 void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
@@ -108,7 +108,7 @@ void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>&
 		oss << ") ";
 	}
 	oss << std::endl;
-	std::cout << oss << std::endl;
+	std::cout << oss.str() << std::endl;
 }
 
 void print_prob(const std::vector<double>& probs, bool log_prob=false){
@@ -117,7 +117,7 @@ void print_prob(const std::vector<double>& probs, bool log_prob=false){
 		if(log_prob){oss << d << " ";}
 		else oss << exp(d) << " ";
 	}
-	std::cout << oss << std::endl;
+	std::cout << oss.str() << std::endl;
 }
 
 std::ostream& operator<<(std::ostream& out, const std::vector<double>& vec){
@@ -1663,8 +1663,8 @@ public:
 						next_emission_score.set_score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
 					}
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						state_id = next_transition_count.get_state_id_to_end(free_end_transition_id);
-						next_transition_count.set_end_score(m, free_end_transition_id, beta[state_id]);
+						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+						next_transition_score.set_end_score(m, free_end_transition_id, beta[state_id]);
 					}
 				}
 				previous_beta = beta;
@@ -1678,10 +1678,10 @@ public:
 							i = next_transition_score.get_from_state_id(free_transition_id);
 							j = next_transition_score.get_to_state_id(free_transition_id);
 							if(j < _silent_states_index){
-								score = previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t + 1]] + log_delta(i, m));
+								score = previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t + 1]] + log_delta(i, m);
 							}
 							else{
-								score = beta[j] + _A[m][j] + log_delta(i, m));
+								score = beta[j] + _A[m][j] + log_delta(i, m);
 							}
 							/* Consider next step non-silent states. */
 							for(std::size_t l = 0; l < _silent_states_index; ++l){

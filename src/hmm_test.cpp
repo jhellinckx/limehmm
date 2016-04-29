@@ -36,10 +36,10 @@
 
 void print_exception(const std::exception& e){ std::cerr << RED << e.what() << RESET << std::endl; }
 
-int assertions = 0;
-int units = 0;
-int failed = 0;
-int successful = 0;
+unsigned int assertions = 0;
+unsigned int units = 0;
+unsigned int failed = 0;
+unsigned int successful = 0;
 
 template<typename Runnable>
 void run_unit_test(const std::string& name, Runnable runnable){
@@ -679,7 +679,6 @@ int main(){
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_with_pseudocount);
 		)
 
-		/* Train Baum-Welch */
 		TEST_UNIT(
 			"baum-welch training (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
