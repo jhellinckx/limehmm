@@ -1143,17 +1143,20 @@ public:
 		const std::vector<std::pair<std::size_t, std::size_t>>* _free_transitions;
 		const std::vector<std::size_t>* _free_pi_begin;
 		const std::vector<std::size_t>* _free_pi_end;
+		double _default_score;
 	public:
 		TransitionScore(const std::vector<std::pair<std::size_t, std::size_t>>& free_transitions,
 			const std::vector<std::size_t>& free_pi_begin,
 			const std::vector<std::size_t>& free_pi_end,
-			std::size_t num_states) :
-				_transitions_scores(num_states, std::vector<double>(free_transitions.size(), 0.0)),
-				_pi_begin_scores(num_states, std::vector<double>(free_pi_begin.size(), 0.0)), 
-				_pi_end_scores(num_states, std::vector<double>(free_pi_end.size(), 0.0)),
+			std::size_t num_states,
+			double default_score = 0.0) :
+				_transitions_scores(num_states, std::vector<double>(free_transitions.size(), default_score)),
+				_pi_begin_scores(num_states, std::vector<double>(free_pi_begin.size(), default_score)), 
+				_pi_end_scores(num_states, std::vector<double>(free_pi_end.size(), default_score)),
 				_free_transitions(&free_transitions),
 				_free_pi_begin(&free_pi_begin),
-				_free_pi_end(&free_pi_end) {}
+				_free_pi_end(&free_pi_end),
+				_default_score(default_score) {}
 
 		/* /!\ Both transition scores need to represent the same hmm in a given training !! */
 		TransitionScore& operator=(const TransitionScore& other) {
@@ -1235,16 +1238,16 @@ public:
 			return (*_free_pi_end)[free_end_transition_id];
 		}
 
-		void reset(){
+		void reset(double reset_score = _default_score){
 			for(std::size_t m = 0; m < _transitions_scores.size(); ++m){
 				for(std::size_t id = 0; id < _transitions_scores[m].size(); ++id){
-					_transitions_scores[m][id] = 0;
+					_transitions_scores[m][id] = reset_score;
 				}
 				for(std::size_t id = 0; id < _pi_begin_scores[m].size(); ++id){
-					_pi_begin_scores[m][id] = 0;
+					_pi_begin_scores[m][id] = reset_score;
 				}
 				for(std::size_t id = 0; id < _pi_end_scores[m].size(); ++id){
-					_pi_end_scores[m][id] = 0;
+					_pi_end_scores[m][id] = reset_score;
 				}
 			}
 		}
@@ -1274,10 +1277,12 @@ public:
 	class EmissionScore{
 		std::vector<std::vector<double>> _emissions_scores;
 		const std::vector<std::pair<std::size_t, std::string>>* _free_emissions;
+		double _default_score;
 	public:
-		EmissionScore(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_states) :
-			_emissions_scores(num_states, std::vector<double>(free_emissions.size(), 0)),
-			_free_emissions(&free_emissions) {}
+		EmissionScore(const std::vector<std::pair<std::size_t, std::string>>& free_emissions, std::size_t num_states, double default_score = 0.0) :
+			_emissions_scores(num_states, std::vector<double>(free_emissions.size(), default_score)),
+			_free_emissions(&free_emissions),
+			_default_score(default_score) {}
 
 		EmissionScore& operator=(const EmissionScore& other) {
 			if(this != &other){
@@ -1318,10 +1323,10 @@ public:
 			}	
 		}
 
-		void reset(){
+		void reset(double reset_score = default_score){
 			for(std::size_t m = 0; m < _emissions_scores.size(); ++m){
 				for(std::size_t id = 0; id < _emissions_scores[m].size(); ++id){
-					_emissions_scores[m][id] = 0;
+					_emissions_scores[m][id] = reset_score;
 				}
 			}
 		}
@@ -1610,6 +1615,14 @@ public:
 	}
 
 
+	double bw_score(std::string first_symbol, std::string second_symbol) const {
+		return (first_symbol == second_symbol) 0 : utils::kNegInf;
+	}
+
+	double log_delta(std::size_t i, std::size_t j) const {
+		return (i == j) ? 0 : utils::kNegInf;
+	}
+
 
 
 	double train_baum_welch(const std::vector<std::vector<std::string>>& sequences, 
@@ -1647,19 +1660,53 @@ public:
 						next_emission_score.score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
 					}
 				}
+				next_transition_score.reset_log_prob();
 				std::vector<double> previous_beta = beta;
 				for(std::size_t t = sequence.size() - 1; t >= 1; --t){
 					beta = backward_step(previous_beta, sequence, t);
+					/* First pass over silent states considering next step non-silent states. */
+					for(std::size_t m = _A.size(); m >= _silent_states_index; --m){
+						next_transition_score.set_score()
+					}
+
 					for(std::size_t m = 0; m < _A.size(); ++m){
 						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
 							i = next_transition_score.get_from_state_id(free_transition_id);
 							j = next_transition_score.get_to_state_id(free_transition_id);
-							next_transition_score.set_score(previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t]] + delta(i, m)) ;
+							next_transition_score.set_score(previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t]] + log_delta(i, m)) ;
+							
 						}
 					}
 
 					previous_beta = beta;
-				}			
+				}
+
+				/* First pass over silent states, considering next step non-silent states. */
+				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+					beta_t[i] = utils::kNegInf;
+					for(std::size_t j = 0; j < _silent_states_index; j++){
+						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
+					}
+				}
+				/* Second pass over silent states, considering current step silent states. */
+				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+					for(std::size_t j = _silent_states_index; j < _A.size(); j++){
+						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
+					}
+				}
+				/* Finally pass over non-silent states. */
+				for(std::size_t i = 0; i < _silent_states_index; ++i){
+					beta_t[i] = utils::kNegInf;
+					for(std::size_t j = 0; j < _silent_states_index; ++j){
+						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
+					}
+					for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
+					}
+				}
+				return beta_t;
+
+
 
 
 				next_transition_score.reset();
