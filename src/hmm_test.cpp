@@ -133,6 +133,15 @@ int main(){
 		double casino_precomputed_end_bwd_biased = 0.0071;
 		double casino_precomputed_likelihood = 0.0028;
 		std::vector<std::string> casino_precomputed_viterbi_path_2_states({"fair", "fair", "fair", "fair", "fair", "fair", "fair", "fair"});
+		/* Training casino. */
+		std::vector<std::vector<std::string>> casino_training_symbols = 
+		{{"H", "T", "H"}, {"H", "H", "H", "H"}, {"T", "H", "T", "H", "T"}, 
+		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
+		{"T", "T", "H", "H", "H", "H", "H", "H", "H", "H", "H"}, 
+		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
+		{"T", "T", "T"}};	
+		double precomputed_casino_improvement_no_pseudocount = utils::round_double(0.639841864861836, 4);
+		double precomputed_casino_improvement_with_pseudocount = utils::round_double(1.7764802457455673, 4);
 
 		/* Simple hmm with 3 states emitting nucleobases. Not normalized. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
@@ -641,14 +650,28 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi training without pseudocounts and with silent states",
+			"viterbi training without pseudocounts and without silent states (casino)",
+			HiddenMarkovModel hmm = casino_hmm;
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_symbols), 4);
+			ASSERT(viterbi_improvement == precomputed_casino_improvement_no_pseudocount);
+		)
+
+		TEST_UNIT(
+			"viterbi training with pseudocounts and without silent states (casino)",
+			HiddenMarkovModel hmm = casino_hmm;
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_symbols, 1.0), 4);
+			ASSERT(viterbi_improvement == precomputed_casino_improvement_with_pseudocount);
+		)
+
+		TEST_UNIT(
+			"viterbi training without pseudocounts and with silent states (profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
 			ASSERT(viterbi_improvement == precomputed_improvement_no_pseudocount);
 		)
 
 		TEST_UNIT(
-			"viterbi training with pseudocounts and with silent states",
+			"viterbi training with pseudocounts and with silent states (profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences, 1.0), 4);
 			ASSERT(viterbi_improvement == precomputed_improvement_with_pseudocount);

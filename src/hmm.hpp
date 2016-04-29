@@ -1238,7 +1238,7 @@ public:
 			return (*_free_pi_end)[free_end_transition_id];
 		}
 
-		void reset(double reset_score = _default_score){
+		void reset(double reset_score){
 			for(std::size_t m = 0; m < _transitions_scores.size(); ++m){
 				for(std::size_t id = 0; id < _transitions_scores[m].size(); ++id){
 					_transitions_scores[m][id] = reset_score;
@@ -1250,6 +1250,10 @@ public:
 					_pi_end_scores[m][id] = reset_score;
 				}
 			}
+		}
+
+		void reset(){
+			reset(_default_score);
 		}
 
 		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
@@ -1323,12 +1327,16 @@ public:
 			}	
 		}
 
-		void reset(double reset_score = default_score){
+		void reset(double reset_score){
 			for(std::size_t m = 0; m < _emissions_scores.size(); ++m){
 				for(std::size_t id = 0; id < _emissions_scores[m].size(); ++id){
 					_emissions_scores[m][id] = reset_score;
 				}
 			}
+		}
+
+		void reset(){
+			reset(_default_score);
 		}
 
 		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
@@ -1616,7 +1624,7 @@ public:
 
 
 	double bw_score(std::string first_symbol, std::string second_symbol) const {
-		return (first_symbol == second_symbol) 0 : utils::kNegInf;
+		return (first_symbol == second_symbol) ? 0 : utils::kNegInf;
 	}
 
 	double log_delta(std::size_t i, std::size_t j) const {
@@ -1631,13 +1639,13 @@ public:
 		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi, 
 		unsigned int max_iterations = hmm_config::kDefaultMaxIterationsViterbi){
 
-		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1);
-		EmissionScore total_emission_score(_free_emissions, 1);
+		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1, utils::kNegInf);
+		EmissionScore total_emission_score(_free_emissions, 1, utils::kNegInf);
 
-		TransitionScore previous_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		EmissionScore previous_emission_score(_free_emissions, _A.size());
-		EmissionScore next_emission_score(_free_emissions, _A.size());
+		TransitionScore previous_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
+		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
+		EmissionScore previous_emission_score(_free_emissions, _A.size(), utils::kNegInf);
+		EmissionScore next_emission_score(_free_emissions, _A.size(), utils::kNegInf);
 		
 		unsigned int iteration = 0;
 		double delta = utils::kInf;
@@ -1660,7 +1668,6 @@ public:
 						next_emission_score.score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
 					}
 				}
-				next_transition_score.reset_log_prob();
 				std::vector<double> previous_beta = beta;
 				for(std::size_t t = sequence.size() - 1; t >= 1; --t){
 					beta = backward_step(previous_beta, sequence, t);
