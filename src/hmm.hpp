@@ -664,68 +664,71 @@ public:
 	std::vector<Distribution*>& raw_pdfs() { return _B; }
 	std::map<std::string, std::size_t>& states_indices() { return _states_indices; }
 
+
+	std::vector<double> forward_init(const std::vector<std::string>& sequence){
+		std::vector<double> alpha_0(_A.size(), utils::kNegInf);
+		/* First iterate over the silent states to compute the probability of
+		passing through silent states before emitting the first symbol. */
+		for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+			alpha_0[i] = _pi_begin[i];
+			for(std::size_t j = _silent_states_index; j < i; ++j){
+				alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
+			}
+		}
+		/* Fill alpha_0 for non-silent states. To compute alpha_0, we need to 
+		sum the probability to directly begin at non-silent state i (pi)
+		with the probabilities to transit from all the silent states which
+		have a begin probability > 0 to non-silent state i. */
+		for(std::size_t i = 0; i < _silent_states_index; ++i){
+			alpha_0[i] = _pi_begin[i];
+			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+				alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
+			}
+			
+		}
+		/* We can now compute alpha_1. */
+		std::vector<double> alpha_1(_A.size(), utils::kNegInf);
+		/* First iterate over non-silent states. */
+		for(std::size_t i = 0; i < _silent_states_index; ++i){
+			alpha_1[i] = alpha_0[i] + (*_B[i])[sequence[0]];
+		}
+		/* Then silent states, in toporder. */
+		for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+			alpha_1[i] = utils::kNegInf;
+			for(std::size_t j = 0; j < i; ++j){
+				alpha_1[i] = utils::sum_log_prob(alpha_1[i], _A[j][i] + alpha_1[j]);
+			}
+		}
+		return alpha_1;
+	}
+
+	std::vector<double> forward_step (const std::vector<std::string>& sequence, const std::vector<double>& alpha_prev_t, std::size_t t) {
+		std::vector<double> alpha_t(_A.size(), utils::kNegInf);
+		/* Normal states. */
+		for(std::size_t i = 0; i < _silent_states_index; ++i){
+			alpha_t[i] = utils::kNegInf;
+			for(std::size_t j = 0; j < _A.size(); ++j){
+				alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_prev_t[j] + _A[j][i]);
+			}
+			alpha_t[i] = alpha_t[i] + (*_B[i])[sequence[t]];
+		}
+		/* Silent states. */
+		for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+			alpha_t[i] = utils::kNegInf;
+			for(std::size_t j = 0; j < i; ++j){
+				alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_t[j] + _A[j][i]);
+			}
+		}
+		return alpha_t;
+	}
+
 	std::vector<double> forward(const std::vector<std::string>& sequence, std::size_t t_max = 0) {
 		if(t_max == 0) t_max = sequence.size();
-		auto forward_init = [&sequence, this]() {
-			std::vector<double> alpha_0(_A.size(), utils::kNegInf);
-			/* First iterate over the silent states to compute the probability of
-			passing through silent states before emitting the first symbol. */
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_0[i] = _pi_begin[i];
-				for(std::size_t j = _silent_states_index; j < i; ++j){
-					alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
-				}
-			}
-			/* Fill alpha_0 for non-silent states. To compute alpha_0, we need to 
-			sum the probability to directly begin at non-silent state i (pi)
-			with the probabilities to transit from all the silent states which
-			have a begin probability > 0 to non-silent state i. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_0[i] = _pi_begin[i];
-				for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-					alpha_0[i] = utils::sum_log_prob(alpha_0[i], _A[j][i] + alpha_0[j]);
-				}
-				
-			}
-			/* We can now compute alpha_1. */
-			std::vector<double> alpha_1(_A.size(), utils::kNegInf);
-			/* First iterate over non-silent states. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_1[i] = alpha_0[i] + (*_B[i])[sequence[0]];
-			}
-			/* Then silent states, in toporder. */
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_1[i] = utils::kNegInf;
-				for(std::size_t j = 0; j < i; ++j){
-					alpha_1[i] = utils::sum_log_prob(alpha_1[i], _A[j][i] + alpha_1[j]);
-				}
-			}
-			return alpha_1;
-		};
-		auto forward_step = [&sequence, this](const std::vector<double>& alpha_prev_t, std::size_t t) {
-			std::vector<double> alpha_t(_A.size(), utils::kNegInf);
-			/* Normal states. */
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				alpha_t[i] = utils::kNegInf;
-				for(std::size_t j = 0; j < _A.size(); ++j){
-					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_prev_t[j] + _A[j][i]);
-				}
-				alpha_t[i] = alpha_t[i] + (*_B[i])[sequence[t]];
-			}
-			/* Silent states. */
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				alpha_t[i] = utils::kNegInf;
-				for(std::size_t j = 0; j < i; ++j){
-					alpha_t[i] = utils::sum_log_prob(alpha_t[i], alpha_t[j] + _A[j][i]);
-				}
-			}
-			return alpha_t;
-		};
 		if(sequence.size() == 0) throw std::logic_error("forward on empty sequence");
 		else{
-			std::vector<double> alpha = forward_init();
+			std::vector<double> alpha = forward_init(sequence);
 			for(std::size_t t = 1; t < std::min(sequence.size(), t_max); ++t) {
-				alpha = forward_step(alpha, t);
+				alpha = forward_step(sequence, alpha, t);
 			}
  			return alpha;
 		}
@@ -793,28 +796,19 @@ public:
 		return beta_T;
 	};
 
-	std::vector<double> backward_step(const std::vector<double>& beta_next_t, const std::vector<std::string>& sequence, std::size_t t) {
+	std::vector<double> backward_step(const std::vector<double>& beta_previous_t, const std::vector<std::string>& sequence, std::size_t t) {
 		std::vector<double> beta_t(_A.size());
-		/* First pass over silent states, considering next step non-silent states. */
-		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+		/* First pass over silent states. */
+		for(std::size_t i = _A.size(); i-- > 0;){
 			beta_t[i] = utils::kNegInf;
+			/* Consider previous step non-silent states. */
 			for(std::size_t j = 0; j < _silent_states_index; j++){
-				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
+				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_previous_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
 			}
-		}
-		/* Second pass over silent states, considering current step silent states. */
-		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-			for(std::size_t j = _silent_states_index; j < _A.size(); j++){
-				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
-			}
-		}
-		/* Finally pass over non-silent states. */
-		for(std::size_t i = 0; i < _silent_states_index; ++i){
-			beta_t[i] = utils::kNegInf;
-			for(std::size_t j = 0; j < _silent_states_index; ++j){
-				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
-			}
-			for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
+			/* Consider current step silent states. 
+			If i is a silent state (i.e. i > _silent_state_index), only iterate for each j > i (topological order !). 
+			Else if i is a non-silent state, iterate over all the silent states. */
+			for(std::size_t j = std::max(i, _silent_states_index); j < _A.size(); j++){
 				beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
 			}
 		}
@@ -825,16 +819,15 @@ public:
 
 	std::pair<std::vector<double>, double> backward_terminate(const std::vector<double>& beta_0, const std::vector<std::string>& sequence){
 		std::vector<double> beta_end(_A.size());
-			/* First pass over silent states, considering next step non-silent states. */
+			/* First pass over silent states. */
 			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
 				beta_end[i] = utils::kNegInf;
+				/* Consider previous step non-silent states. */
 				for(std::size_t j = 0; j < _silent_states_index; j++){
 					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_0[j] + _A[i][j] + (*_B[j])[sequence[0]]);
 				}
-			}
-			/* Second pass over silent states, considering current step silent states. */
-			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-				for(std::size_t j = _silent_states_index; j < _A.size(); j++){
+				/* Consider current step silent states. */
+				for(std::size_t j = i; j < _A.size(); j++){
 					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
 				}
 			}
@@ -1652,69 +1645,73 @@ public:
 		double initial_likelihood = log_likelihood(sequences);
 		double previous_likelihood = initial_likelihood;
 		double current_likelihood;
+		std::vector<double> previous_beta;
+		std::vector<double> beta;
+		std::vector<double> alpha_1;
+		std::size_t i, j, state_id;
+		double score;
+		std::string gamma;
 		while((iteration <= min_iterations || delta > convergence_threshold) 
 			&& iteration <= max_iterations) {
 			/* Iterate over each sequence and compute the counts. */
 			for(const std::vector<std::string>& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
-				std::string gamma;
-				std::size_t state_id, i, j;
-				std::vector<double> beta = backward_init();
+				beta = backward_init();
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
 						state_id = next_emission_score.get_state_id(free_emission_id);
 						gamma = next_emission_score.get_symbol(free_emission_id);
-						next_emission_score.score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
+						next_emission_score.set_score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
 					}
 				}
-				std::vector<double> previous_beta = beta;
+				previous_beta = beta;
+				previous_transition_score = next_transition_score; 
+				previous_emission_score = next_emission_score;
 				for(std::size_t t = sequence.size() - 1; t >= 1; --t){
 					beta = backward_step(previous_beta, sequence, t);
-					/* First pass over silent states considering next step non-silent states. */
-					for(std::size_t m = _A.size(); m >= _silent_states_index; --m){
-						next_transition_score.set_score()
-					}
-
-					for(std::size_t m = 0; m < _A.size(); ++m){
+					for(std::size_t m = _A.size(); m-- > 0;){
+						/* Compute transitions scores for current step. */
 						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
 							i = next_transition_score.get_from_state_id(free_transition_id);
 							j = next_transition_score.get_to_state_id(free_transition_id);
-							next_transition_score.set_score(previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t]] + log_delta(i, m)) ;
-							
+							if(j < _silent_states_index){
+								score = previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t + 1]] + log_delta(i, m));
+							}
+							else{
+								score = beta[j] + _A[m][j] + log_delta(i, m));
+							}
+							/* Consider next step non-silent states. */
+							for(std::size_t l = 0; l < _silent_states_index; ++l){
+								score = utils::sum_log_prob(score, previous_transition_score.score(l, free_transition_id) + _A[m][l] + (*_B[l])[sequence[t + 1]]);
+							}
+							/* Consider current step silent states. */
+							for(std::size_t l = std::max(m, _silent_states_index); l < _A.size(); ++l){
+								score = utils::sum_log_prob(score,  next_transition_score.score(l, free_transition_id) + _A[m][l]);
+							}
+							next_transition_score.set_score(m, free_transition_id, score);
+						}
+						/* Compute emissions score for current step. */
+						for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
+							state_id = next_emission_score.get_state_id(free_emission_id);
+							gamma = next_emission_score.get_symbol(free_emission_id);
+							score = beta[m] + bw_score(sequence[t], gamma) + log_delta(m, state_id);
+							/* Consider next step non-silent states. */
+							for(std::size_t l = 0; l < _silent_states_index; ++l){
+								score = utils::sum_log_prob(score, previous_emission_score.score(l, free_emission_id) + _A[m][l] + (*_B[l])[sequence[t + 1]]);
+							}
+							/* Consider current step silent states. */
+							for(std::size_t l = std::max(m, _silent_states_index); l < _A.size(); ++l){
+								score = utils::sum_log_prob(score,  next_emission_score.score(l, free_emission_id) + _A[m][l]);
+							}
+							next_emission_score.set_score(m, free_emission_id, score);
 						}
 					}
-
 					previous_beta = beta;
+					previous_transition_score = next_transition_score;
+					previous_emission_score = next_emission_score;
 				}
-
-				/* First pass over silent states, considering next step non-silent states. */
-				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-					beta_t[i] = utils::kNegInf;
-					for(std::size_t j = 0; j < _silent_states_index; j++){
-						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
-					}
-				}
-				/* Second pass over silent states, considering current step silent states. */
-				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-					for(std::size_t j = _silent_states_index; j < _A.size(); j++){
-						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
-					}
-				}
-				/* Finally pass over non-silent states. */
-				for(std::size_t i = 0; i < _silent_states_index; ++i){
-					beta_t[i] = utils::kNegInf;
-					for(std::size_t j = 0; j < _silent_states_index; ++j){
-						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_next_t[j] + _A[i][j] + (*_B[j])[sequence[t + 1]]);
-					}
-					for(std::size_t j = _silent_states_index; j < _A.size(); ++j){
-						beta_t[i] = utils::sum_log_prob(beta_t[i], beta_t[j] + _A[i][j]);
-					}
-				}
-				return beta_t;
-
-
-
+				alpha_1 = forward_init()
 
 				next_transition_score.reset();
 				previous_transition_score.reset();

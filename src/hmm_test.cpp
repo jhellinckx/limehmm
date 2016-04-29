@@ -255,8 +255,8 @@ int main(){
 		{"A", "A", "T"}, {"C", "T"}, {"A", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, 
 		{"C", "T"}, {"C", "T"}, {"C", "T"}, {"A", "C", "T"}, {"A", "C", "T"}, 
 		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
-		double precomputed_improvement_no_pseudocount = 84.9318;
-		double precomputed_improvement_with_pseudocount = 78.9441;
+		double precomputed_profile_improvement_no_pseudocount = 84.9318;
+		double precomputed_profile_improvement_with_pseudocount = 78.9441;
 		std::vector<double> precomputed_observation_likelihood = 
 		{-0.505202786679,-0.505202786679,-4.85332533917,-5.86447364745,-0.505202786679,-0.505202786679,
 		-4.77279340553,-8.94719166767,-5.71623676018,-7.35302419896,-3.61187131339,-7.35302419896,
@@ -667,14 +667,14 @@ int main(){
 			"viterbi training without pseudocounts and with silent states (profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
-			ASSERT(viterbi_improvement == precomputed_improvement_no_pseudocount);
+			ASSERT(viterbi_improvement == precomputed_profile_improvement_no_pseudocount);
 		)
 
 		TEST_UNIT(
 			"viterbi training with pseudocounts and with silent states (profile hmm)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences, 1.0), 4);
-			ASSERT(viterbi_improvement == precomputed_improvement_with_pseudocount);
+			ASSERT(viterbi_improvement == precomputed_profile_improvement_with_pseudocount);
 		)
 
 		/* Train Baum-Welch */
