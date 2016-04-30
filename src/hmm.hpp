@@ -1616,7 +1616,7 @@ public:
 	}
 
 
-	double bw_score(std::string first_symbol, std::string second_symbol) const {
+	double log_score(std::string first_symbol, std::string second_symbol) const {
 		return (first_symbol == second_symbol) ? 0 : utils::kNegInf;
 	}
 
@@ -1674,7 +1674,7 @@ public:
 					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
 						state_id = next_emission_score.get_state_id(free_emission_id);
 						gamma = next_emission_score.get_symbol(free_emission_id);
-						next_emission_score.set_score(m, free_emission_id, beta[state_id] + bw_score(sequence[sequence.size() - 1], gamma));	
+						next_emission_score.set_score(m, free_emission_id, beta[state_id] + log_score(sequence[sequence.size() - 1], gamma));	
 					}
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
 						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
@@ -1720,7 +1720,7 @@ public:
 						for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
 							state_id = next_emission_score.get_state_id(free_emission_id);
 							gamma = next_emission_score.get_symbol(free_emission_id);
-							score = beta[m] + bw_score(sequence[t], gamma) + log_delta(m, state_id);
+							score = beta[m] + log_score(sequence[t], gamma) + log_delta(m, state_id);
 							/* Consider next step non-silent states. */
 							for(std::size_t n = 0; n < _silent_states_index; ++n){
 								score = utils::sum_log_prob(score, previous_emission_score.score(n, free_emission_id) + _A[m][n] + (*_B[n])[sequence[t + 1]]);
@@ -1743,35 +1743,35 @@ public:
 				/* Begin transitions. */
 				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < next_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
 					state_id = next_transition_score.get_state_id_from_begin(free_begin_transition_id);
-					score = alpha_1[state_id] + beta[state_id];
-					total_transition_score.set_begin_score(0, free_begin_transition_id, total_transition_score.score_begin(0, free_begin_transition_id) + exp(score));
+					score = exp(alpha_1[state_id] + beta[state_id]);
+					total_transition_score.set_begin_score(0, free_begin_transition_id, total_transition_score.score_begin(0, free_begin_transition_id) + score);
 				}
 
 				/* Mid transitions. */
 				for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-					score = utils::kNegInf;
+					score = 0;
 					for(std::size_t m = _A.size(); m-- > 0;){
-						score = utils::sum_log_prob(score, previous_transition_score.score(m, free_transition_id) + alpha_1[m]);
+						score += exp(previous_transition_score.score(m, free_transition_id) + alpha_1[m]);
 					}
-					total_transition_score.set_score(0, free_transition_id, total_transition_score.score(0, free_transition_id) + exp(score));
+					total_transition_score.set_score(0, free_transition_id, total_transition_score.score(0, free_transition_id) + score);
 				}
 				
 				/* End transitions. */
 				for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-					score = utils::kNegInf;
+					score = 0;
 					for(std::size_t m = _A.size(); m-- > 0;){
-						score = utils::sum_log_prob(score, previous_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
+						score += exp(previous_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
 					}
-					total_transition_score.set_end_score(0, free_end_transition_id, total_transition_score.score_end(0, free_end_transition_id) + exp(score));
+					total_transition_score.set_end_score(0, free_end_transition_id, total_transition_score.score_end(0, free_end_transition_id) + score);
 				}
 
 				/* Emissions. */
-				for(std::size_t free_emission_id = 0; free_emission_id < next_transition_score.num_free_transitions(); ++free_emission_id){
-					score = utils::kNegInf;
+				for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
+					score = 0;
 					for(std::size_t m = _A.size(); m-- > 0;){
-						score = utils::sum_log_prob(score, previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
+						score += exp(previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
 					}
-					total_emission_score.set_score(0, free_emission_id, total_emission_score.score(0, free_emission_id) +  exp(score));
+					total_emission_score.set_score(0, free_emission_id, total_emission_score.score(0, free_emission_id) +  score);
 				}
 
 				next_transition_score.reset();

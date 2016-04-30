@@ -699,6 +699,7 @@ int main(){
 				hmm_cpy.train_baum_welch(casino_training_sequences_3, 0.0, i);
 				print_transitions(hmm_cpy.raw_transitions(), hmm_cpy.states_indices(), true);
 				print_pi_begin(hmm_cpy.raw_pi_begin(), hmm_cpy.states_names(), true);
+				print_distributions(hmm_cpy.raw_pdfs(), hmm_cpy.states_names(), false);
 			}
 			
 			//std::cout << "EXPECTED : " << precomputed_casino_bw_improvement_no_pseudocount_2 << std::endl;
