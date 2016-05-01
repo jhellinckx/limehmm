@@ -691,17 +691,23 @@ int main(){
 		TEST_UNIT(
 			"baum-welch training (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			HiddenMarkovModel hmm_cpy;
-			print_transitions(hmm.raw_transitions(), hmm.states_indices(), true); 
-			for(unsigned int i = 1; i < 6; ++i){
-				hmm_cpy = hmm;
-				std::cout << "ITERATION " << i << std::endl;
-				hmm_cpy.train_baum_welch(casino_training_sequences_3, 0.0, i);
-				print_transitions(hmm_cpy.raw_transitions(), hmm_cpy.states_indices(), true);
-				print_pi_begin(hmm_cpy.raw_pi_begin(), hmm_cpy.states_names(), true);
-				print_distributions(hmm_cpy.raw_pdfs(), hmm_cpy.states_names(), false);
-			}
-			
+			//HiddenMarkovModel hmm_cpy;
+			//print_transitions(hmm.raw_transitions(), hmm.states_indices(), true); 
+			//for(unsigned int i = 1; i < 6; ++i){
+			//	hmm_cpy = hmm;
+			//	std::cout << "ITERATION " << i << std::endl;
+			//	hmm_cpy.train_baum_welch(casino_training_sequences_3, 0.0, i);
+			//	print_transitions(hmm_cpy.raw_transitions(), hmm_cpy.states_indices(), true);
+			//	print_pi_begin(hmm_cpy.raw_pi_begin(), hmm_cpy.states_names(), true);
+			//	print_distributions(hmm_cpy.raw_pdfs(), hmm_cpy.states_names(), false);
+			//}
+			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
+			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			hmm.train_baum_welch(casino_training_sequences_3, 0.0, 1);
+			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
+			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
 			//std::cout << "EXPECTED : " << precomputed_casino_bw_improvement_no_pseudocount_2 << std::endl;
 			//std::cout << "GOT : " << baum_welch_improvement << std::endl;
 			//print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);

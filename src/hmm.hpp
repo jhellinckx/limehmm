@@ -1665,7 +1665,7 @@ public:
 		std::string gamma;
 		while((iteration < min_iterations || delta > convergence_threshold) 
 			&& iteration < max_iterations) {
-			/* Iterate over each sequence and compute the counts. */
+ 			/* Iterate over each sequence and compute the counts. */
 			for(const std::vector<std::string>& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
@@ -1684,7 +1684,7 @@ public:
 				previous_beta = beta;
 				previous_transition_score = next_transition_score; 
 				previous_emission_score = next_emission_score;
-				for(std::size_t t = sequence.size() - 2; t >= 1; --t){
+				for(std::size_t t = sequence.size() - 1; t-- > 0;){
 					beta = backward_step(previous_beta, sequence, t);
 					for(std::size_t m = _A.size(); m-- > 0;){
 						/* Compute transitions scores for current step. */
@@ -1739,7 +1739,7 @@ public:
 				}
 				alpha_1 = forward_init(sequence);
 
-				/* Update total scores. */
+				/* Update total scores. Don't use log probabilities in total scores. */
 				/* Begin transitions. */
 				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < next_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
 					state_id = next_transition_score.get_state_id_from_begin(free_begin_transition_id);
@@ -1771,7 +1771,7 @@ public:
 					for(std::size_t m = _A.size(); m-- > 0;){
 						score += exp(previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
 					}
-					total_emission_score.set_score(0, free_emission_id, total_emission_score.score(0, free_emission_id) +  score);
+					total_emission_score.set_score(0, free_emission_id, total_emission_score.score(0, free_emission_id) + score);
 				}
 
 				next_transition_score.reset();
