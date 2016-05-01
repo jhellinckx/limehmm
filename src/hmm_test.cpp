@@ -713,7 +713,7 @@ int main(){
 			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
 			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
 			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			hmm.train_baum_welch(casino_training_sequences_3, 0.0, 2);
+			hmm.train_baum_welch(casino_training_sequences_2, 0.0, 1);
 			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
 			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
 			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
