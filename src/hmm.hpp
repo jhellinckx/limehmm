@@ -1678,7 +1678,7 @@ public:
 					}
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
 						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
-						next_transition_score.set_end_score(m, free_end_transition_id, beta[state_id]);
+						next_transition_score.set_end_score(m, free_end_transition_id, beta[state_id] + log_delta(m, state_id));
 					}
 				}
 				previous_beta = beta;
@@ -1779,7 +1779,8 @@ public:
 				next_emission_score.reset();
 				previous_emission_score.reset();
 			}
-			update_model_from_scores(total_transition_score, total_emission_score, transition_pseudocount);
+			/* No pseudocount for b-w training ! */
+			update_model_from_scores(total_transition_score, total_emission_score, 0.0);
 			total_transition_score.reset();
 			total_emission_score.reset();
 			current_likelihood = log_likelihood(sequences);
