@@ -23,7 +23,7 @@
 template<typename Elem>
 using Matrix = std::vector<std::vector<Elem>>;
 
-void print_transitions(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = false){
+void print_transitions(const Matrix<double>& matrix, const std::map<std::string, std::size_t>& indices, bool log_prob = true){
 	std::size_t longest_string = 0;
 	for(std::size_t i = 0; i < matrix.size(); ++i){
 		for(std::size_t j = 0; j < matrix[i].size(); ++j){
@@ -58,7 +58,7 @@ void print_transitions(const Matrix<double>& matrix, const std::map<std::string,
 	std::cout << out.str() << std::endl;
 }
 
-void print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=false){
+void print_distributions(const std::vector<Distribution*>& dists, const std::vector<std::string>& names, bool log_prob=true){
 	std::ostringstream oss;
 	for(std::size_t state_id = 0; state_id < dists.size(); ++state_id){
 		Distribution* dist = dists[state_id];
@@ -86,7 +86,7 @@ void print_names(const std::vector<std::size_t>& ids, const std::vector<std::str
 	std::cout << oss.str() << std::endl;
 }
 
-void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=true){
 	std::ostringstream oss;
 	oss << "Pi begin : ";
 	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
@@ -98,7 +98,7 @@ void print_pi_begin(const std::vector<double>& pi, const std::vector<std::string
 	std::cout << oss.str() << std::endl;
 }
 
-void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=false){
+void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>& names, bool log_prob=true){
 	std::ostringstream oss;
 	oss << "Pi end : ";
 	for(std::size_t state_id = 0; state_id < pi.size(); ++state_id){
@@ -111,7 +111,7 @@ void print_pi_end(const std::vector<double>& pi, const std::vector<std::string>&
 	std::cout << oss.str() << std::endl;
 }
 
-void print_prob(const std::vector<double>& probs, bool log_prob=false){
+void print_prob(const std::vector<double>& probs, bool log_prob=true){
 	std::ostringstream oss;
 	for(double d : probs){
 		if(log_prob){oss << d << " ";}
@@ -1215,19 +1215,19 @@ public:
 			}
 		}
 
-		std::size_t get_from_state_id(std::size_t free_transition_id){
+		std::size_t get_from_state_id(std::size_t free_transition_id) const {
 			return (*_free_transitions)[free_transition_id].first;
 		}
 
-		std::size_t get_to_state_id(std::size_t free_transition_id){
+		std::size_t get_to_state_id(std::size_t free_transition_id) const {
 			return (*_free_transitions)[free_transition_id].second;	
 		}
 
-		std::size_t get_state_id_from_begin(std::size_t free_begin_transition_id){
+		std::size_t get_state_id_from_begin(std::size_t free_begin_transition_id) const {
 			return (*_free_pi_begin)[free_begin_transition_id];
 		}
 
-		std::size_t get_state_id_to_end(std::size_t free_end_transition_id){
+		std::size_t get_state_id_to_end(std::size_t free_end_transition_id) const {
 			return (*_free_pi_end)[free_end_transition_id];
 		}
 
@@ -1249,22 +1249,25 @@ public:
 			reset(_default_score);
 		}
 
-		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
-			std::ostringstream oss;
+		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "", bool log_prob = true) const {
+			std::ostringstream oss; double score;
 			std::string name = from.empty() ? names[m] : from;
 			oss << "From state " << name << std::endl;
 			oss << "Begin scores : " << std::endl;
 			for(std::size_t begin_transition_id = 0; begin_transition_id < _pi_begin_scores[m].size(); ++begin_transition_id){
-				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << _pi_begin_scores[m][begin_transition_id] << ") "; 
+				score = log_prob ? _pi_begin_scores[m][begin_transition_id] : exp(_pi_begin_scores[m][begin_transition_id]);
+				oss << "(" << names[(*_free_pi_begin)[begin_transition_id]] << " = " << score << ") "; 
 			}
 			oss << std::endl << "Mid scores : " << std::endl;
 			for(std::size_t transition_id = 0; transition_id < _transitions_scores[m].size(); ++transition_id){
+				score = log_prob ? _transitions_scores[m][transition_id] : exp(_transitions_scores[m][transition_id]);
 				oss << "(" << names[(*_free_transitions)[transition_id].first] << "->" << 
-				names[(*_free_transitions)[transition_id].second] << " = " << _transitions_scores[m][transition_id] << ") "; 
+				names[(*_free_transitions)[transition_id].second] << " = " << score << ") "; 
 			}
 			oss << std::endl << "End scores : " << std::endl;
 			for(std::size_t end_transition_id = 0; end_transition_id < _pi_end_scores[m].size(); ++end_transition_id){
-				oss << "(" << names[(*_free_pi_end)[end_transition_id]] << " = " << _pi_end_scores[m][end_transition_id] << ") "; 
+				score = log_prob ?  _pi_end_scores[m][end_transition_id] : exp(_pi_end_scores[m][end_transition_id]);
+				oss << "(" << names[(*_free_pi_end)[end_transition_id]] << " = " << score << ") "; 
 			}
 			oss << std::endl;
 			return oss.str();
@@ -1332,13 +1335,14 @@ public:
 			reset(_default_score);
 		}
 
-		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "") const {
-			std::ostringstream oss;
+		std::string to_string(std::size_t m, const std::vector<std::string>& names, const std::string& from = "", bool log_prob = true) const {
+			std::ostringstream oss; double score;
 			std::string name = from.empty() ? names[m] : from;
 			oss << "From state " << name << std::endl;
 			oss << "Emissions scores : " << std::endl;
 			for(std::size_t emission_id = 0; emission_id < _emissions_scores[m].size(); ++emission_id){
-				oss << "(" << names[(*_free_emissions)[emission_id].first] << "->" << (*_free_emissions)[emission_id].second << " = " << _emissions_scores[m][emission_id] << ") ";
+				score = log_prob ? _emissions_scores[m][emission_id] : exp(_emissions_scores[m][emission_id]);
+				oss << "(" << names[(*_free_emissions)[emission_id].first] << "->" << (*_free_emissions)[emission_id].second << " = " << score << ") ";
 			}
 			oss << std::endl;
 			return oss.str();
@@ -1625,20 +1629,25 @@ public:
 	}
 
 	template<typename Score>
-	void print_scores(const Score& score, std::string from_str = "", bool from_all = true, std::size_t from = 0){
+	void print_scores(const Score& score, std::string from_str = "", bool from_all = true, std::size_t from = 0, bool log_prob = true){
 		if(from_all){
 			for(std::size_t m = 0; m < _A.size(); ++m){
-				std::cout << score.to_string(m, _states_names, from_str) << std::endl;
+				std::cout << score.to_string(m, _states_names, from_str, log_prob) << std::endl;
 			}
 		}
 		else{
-			std::cout << score.to_string(from, _states_names, from_str) << std::endl;
+			std::cout << score.to_string(from, _states_names, from_str, log_prob) << std::endl;
 		}
 	}
 
 	template<typename Score>
-	void print_total_scores(const Score& score){
-		print_scores(score, "total", false, 0);
+	void print_total_scores(const Score& score, bool log_prob = true){
+		print_scores(score, "total", false, 0, log_prob);
+	}
+
+	template<typename Score>
+	void print_all_scores(const Score& score, bool log_prob = true){
+		print_scores(score, "", true, 0, log_prob);
 	}
 
 	void update_model_from_log_scores(const TransitionScore& transitions_scores, 
@@ -1726,6 +1735,8 @@ public:
 		double convergence_threshold = hmm_config::kDefaultConvergenceThreshold,
 		unsigned int min_iterations = hmm_config::kDefaultMinIterationsViterbi){
 
+		if(transition_pseudocount > 0) { std::cout << "Warning : baum-welch algorithm does not add pseudocounts ! "; }
+
 		TransitionScore total_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, 1, utils::kNegInf);
 		EmissionScore total_emission_score(_free_emissions, 1, utils::kNegInf);
 
@@ -1751,6 +1762,8 @@ public:
 			for(const std::vector<std::string>& sequence : sequences){
 				/* If sequence is empty, go to next sequence. */
 				if(sequence.size() == 0) { continue; }
+
+				/* Initialization. */
 				beta = backward_init();
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
@@ -1766,6 +1779,7 @@ public:
 				previous_beta = beta;
 				previous_transition_score = next_transition_score; 
 				previous_emission_score = next_emission_score;
+				/* Recurrence. */
 				for(std::size_t t = sequence.size() - 1; t-- > 0;){
 					beta = backward_step(previous_beta, sequence, t);
 					for(std::size_t m = _A.size(); m-- > 0;){
@@ -1814,24 +1828,45 @@ public:
 							next_emission_score.set_score(m, free_emission_id, score);
 						}
 					}
-
 					previous_beta = beta;
 					previous_transition_score = next_transition_score;
 					previous_emission_score = next_emission_score;
 				}
+				/* Termination. */
 				alpha_1 = forward_init(sequence);
-
+				/* Begin transitions. */
+				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < previous_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
+					state_id = previous_transition_score.get_state_id_from_begin(free_begin_transition_id);
+					previous_transition_score.set_begin_score(0, free_begin_transition_id, alpha_1[state_id] + beta[state_id]);
+				}
+				for(std::size_t m = 0; m < _A.size(); ++m){
+					/* Mid transitions. */
+					for(std::size_t free_transition_id = 0; free_transition_id < previous_transition_score.num_free_transitions(); ++free_transition_id){
+						previous_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id) + alpha_1[m]);						
+					}
+					/* End transitions. */
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < previous_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						previous_transition_score.set_end_score(m, free_end_transition_id, previous_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
+					}
+					/* Emissions. */
+					for(std::size_t free_emission_id = 0; free_emission_id < previous_emission_score.num_free_emissions(); ++free_emission_id){
+						previous_emission_score.set_score(m, free_emission_id, previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
+					}
+				}
 				/* Update total scores. */
+				double seq_log_likelihood = log_likelihood(sequence);
 				/* Transitions. */
-				log_update_transition_score(previous_transition_score, total_transition_score, alpha_1, beta);
+				log_update_transition_score(previous_transition_score, total_transition_score, seq_log_likelihood);
+
 				/* Emissions. */
-				log_update_emission_score(previous_emission_score, total_emission_score, alpha_1);
+				log_update_emission_score(previous_emission_score, total_emission_score, seq_log_likelihood);
 
 				next_transition_score.reset();
 				previous_transition_score.reset();
 				next_emission_score.reset();
 				previous_emission_score.reset();
 			}
+
 			/* No pseudocount for b-w training ! */
 			update_model_from_log_scores(total_transition_score, total_emission_score);
 			total_transition_score.reset();
@@ -1845,56 +1880,55 @@ public:
 		return current_likelihood - initial_likelihood;
 	}
 
-	void log_update_transition_score(const TransitionScore& current_transition_score, TransitionScore& total_transition_score, const std::vector<double>& alpha_1, const std::vector<double>& beta){
-		std::size_t state_id;
+	void log_update_transition_score(const TransitionScore& current_transition_score, TransitionScore& total_transition_score, double seq_log_likelihood){
 		double score;
 		/* Begin transitions. */
 		for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < current_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
-			state_id = current_transition_score.get_state_id_from_begin(free_begin_transition_id);
-			score = utils::sum_log_prob(total_transition_score.score_begin(0, free_begin_transition_id), alpha_1[state_id] + beta[state_id]);
+			score = utils::sum_log_prob(total_transition_score.score_begin(0, free_begin_transition_id), current_transition_score.score_begin(0, free_begin_transition_id) - seq_log_likelihood);
 			total_transition_score.set_begin_score(0, free_begin_transition_id, score);
 		}
 
 		/* Mid transitions. */
 		for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
 			score = utils::kNegInf;
-			for(std::size_t m = _A.size(); m-- > 0;){
-				score = utils::sum_log_prob(score, current_transition_score.score(m, free_transition_id) + alpha_1[m]);
+			for(std::size_t m = 0; m < _A.size(); ++m){
+				score = utils::sum_log_prob(score, current_transition_score.score(m, free_transition_id));
 			}
-			score = utils::sum_log_prob(score, total_transition_score.score(0, free_transition_id));
+
+			score = utils::sum_log_prob(score - seq_log_likelihood, total_transition_score.score(0, free_transition_id));
 			total_transition_score.set_score(0, free_transition_id, score);
 		}
 		
 		/* End transitions. */
 		for(std::size_t free_end_transition_id = 0; free_end_transition_id < current_transition_score.num_free_end_transitions(); ++free_end_transition_id){
 			score = utils::kNegInf;
-			for(std::size_t m = _A.size(); m-- > 0;){
-				score = utils::sum_log_prob(score, current_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
+			for(std::size_t m = 0; m < _A.size(); ++m){
+				score = utils::sum_log_prob(score, current_transition_score.score_end(m, free_end_transition_id));
 			}
-			score = utils::sum_log_prob(score, total_transition_score.score_end(0, free_end_transition_id));
+			score = utils::sum_log_prob(score - seq_log_likelihood, total_transition_score.score_end(0, free_end_transition_id));
 			total_transition_score.set_end_score(0, free_end_transition_id, score);
 		}
 	}
 
-	void log_update_emission_score(const EmissionScore& current_emission_score, EmissionScore& total_emission_score, const std::vector<double>& alpha_1){
+	void log_update_emission_score(const EmissionScore& current_emission_score, EmissionScore& total_emission_score, double seq_log_likelihood){
 		double score;
 		for(std::size_t free_emission_id = 0; free_emission_id < current_emission_score.num_free_emissions(); ++free_emission_id){
 			score = utils::kNegInf;
-			for(std::size_t m = _A.size(); m-- > 0;){
-				score = utils::sum_log_prob(score, current_emission_score.score(m, free_emission_id) + alpha_1[m]);
+			for(std::size_t m = 0; m < _A.size(); ++m){
+				score = utils::sum_log_prob(score, current_emission_score.score(m, free_emission_id));
 			}
-			score = utils::sum_log_prob(score, total_emission_score.score(0, free_emission_id));
+			score = utils::sum_log_prob(score - seq_log_likelihood, total_emission_score.score(0, free_emission_id));
 			total_emission_score.set_score(0, free_emission_id, score);
 		}
 	}
 
-	void update_transition_score(const TransitionScore& current_transition_score, TransitionScore& total_transition_score){
+	// void update_transition_score(const TransitionScore& current_transition_score, TransitionScore& total_transition_score){
 
-	}
+	// }
 
-	void update_emission_score(const EmissionScore& current_emission_score, EmissionScore& total_emission_score){
+	// void update_emission_score(const EmissionScore& current_emission_score, EmissionScore& total_emission_score){
 
-	}
+	// }
 
 	void train_stochastic_em() {
 

@@ -170,6 +170,7 @@ public:
 
 	virtual double& operator[] (const std::string& symbol) {
 		if(!contains(symbol)){
+			std::cout << "DIST DOES NOT CONTAIN SYMBOL" << std::endl;
 			_distribution[symbol] = (this->uses_log_probabilities()) ? utils::kNegInf : 0.0;
 		}
 		return _distribution[symbol];

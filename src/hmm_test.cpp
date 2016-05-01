@@ -154,6 +154,9 @@ int main(){
 		std::vector<std::vector<std::string>> casino_training_sequences_3 = 
 		{{"T", "H", "T", "T", "T", "H"}};
 
+		std::vector<std::vector<std::string>> casino_training_sequences_4 = 
+		{{"T", "H", "H", "T"}};
+
 		/* Simple hmm with 3 states emitting nucleobases. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
 		DiscreteDistribution dist1({{"A", 0.35}, {"C", 0.20}, {"G", 0.05}, {"T", 0.40}});
