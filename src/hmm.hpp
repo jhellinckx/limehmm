@@ -1674,7 +1674,7 @@ public:
 					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
 						state_id = next_emission_score.get_state_id(free_emission_id);
 						gamma = next_emission_score.get_symbol(free_emission_id);
-						next_emission_score.set_score(m, free_emission_id, beta[state_id] + log_score(sequence[sequence.size() - 1], gamma));	
+						next_emission_score.set_score(m, free_emission_id, beta[state_id] + log_score(sequence[sequence.size() - 1], gamma) + log_delta(state_id, m));	
 					}
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
 						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
