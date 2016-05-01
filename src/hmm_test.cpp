@@ -156,9 +156,9 @@ int main(){
 
 		/* Simple hmm with 3 states emitting nucleobases. Not normalized. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
-		DiscreteDistribution dist1({{"A", 0.35}, {"C", 0.20}, {"G", 0.05}, {"T", 40}});
-		DiscreteDistribution dist2({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 25}});
-		DiscreteDistribution dist3({{"A", 0.10}, {"C", 0.40}, {"G", 0.40}, {"T", 10}});
+		DiscreteDistribution dist1({{"A", 0.35}, {"C", 0.20}, {"G", 0.05}, {"T", 0.40}});
+		DiscreteDistribution dist2({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
+		DiscreteDistribution dist3({{"A", 0.10}, {"C", 0.40}, {"G", 0.40}, {"T", 0.10}});
 		State s1("s1", dist1);
 		State s2("s2", dist2);
 		State s3("s3", dist3);
@@ -173,11 +173,10 @@ int main(){
 		nucleobase_3_states_hmm.add_transition(s2, s3, 0.10);
 		nucleobase_3_states_hmm.add_transition(s3, s3, 0.70);
 		nucleobase_3_states_hmm.end_transition(s3, 0.30);
-		/* Don't normalize. */
-		nucleobase_3_states_hmm.brew(false); 
+		nucleobase_3_states_hmm.brew(); 
 		/* Precomputed values. */
 		std::vector<std::string> nucleobase_symbols({"A", "C", "G", "A", "C", "T", "A", "T", "T", "C", "G", "A", "T"});
-		double nucleobase_precomputed_log_likelihood = utils::round_double(-4.31828085576, 6);
+		double nucleobase_precomputed_viterbi_log_likelihood = utils::round_double(-24.876606671801692, 4);
 		std::vector<std::string> nucleobase_precomputed_viterbi_path_3_states({"s1", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s2", "s3"});
 		
 		/* Profile hmm with 10 states. */
@@ -620,12 +619,13 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi decode / log_likelihood (3 states nucleobase)",
+			"viterbi decode/likelihood (3 states nucleobase)",
 			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
 			std::vector<std::string> symbols = nucleobase_symbols;
-			double log_likelihood = utils::round_double(hmm.log_likelihood(symbols), 6);
-			ASSERT(log_likelihood == nucleobase_precomputed_log_likelihood);
-			std::vector<std::string> viterbi_path_3_states = hmm.decode(symbols).first;
+			auto viterbi_decode = hmm.decode(symbols);
+			std::vector<std::string> viterbi_path_3_states = viterbi_decode.first;
+			double viterbi_log_likelihood = utils::round_double(viterbi_decode.second, 4);
+			ASSERT(viterbi_log_likelihood == nucleobase_precomputed_viterbi_log_likelihood);
 			ASSERT(viterbi_path_3_states == nucleobase_precomputed_viterbi_path_3_states);
 		)
 
@@ -703,10 +703,12 @@ int main(){
 			//}
 			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
 			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
 			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
 			hmm.train_baum_welch(casino_training_sequences_3);
-			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
-			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
+			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
+			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
 			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
 			//std::cout << "EXPECTED : " << precomputed_casino_bw_improvement_no_pseudocount_2 << std::endl;
 			//std::cout << "GOT : " << baum_welch_improvement << std::endl;
