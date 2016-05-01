@@ -693,7 +693,7 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"baum-welch training (casino)",
+			"baum-welch training 1 sequence (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
 			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
 			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
@@ -707,17 +707,45 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"baum-welch training with end state (nucleobase)",
-			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
-			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
-			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
-			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
-			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			hmm.train_baum_welch(nucleobase_training_sequences);
+			"baum-welch training batch of sequences (casino)",
+			HiddenMarkovModel hmm = casino_hmm;
 			print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
 			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
 			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
 			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			hmm.train_baum_welch(casino_training_sequences_3, 0.0, 2);
+			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
+			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
+			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+		)
+
+		TEST_UNIT(
+			"baum-welch training with end state (nucleobase)",
+			// HiddenMarkovModel hmm = nucleobase_3_states_hmm;
+			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
+			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
+			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			// hmm.train_baum_welch(nucleobase_training_sequences);
+			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
+			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
+			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
+			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+		)
+
+		TEST_UNIT(
+			"baum-welch training with silent states (profile)",
+			// HiddenMarkovModel hmm = profile_10_states_hmm;
+			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
+			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
+			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
+			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			// hmm.train_baum_welch(profile_training_sequences);
+			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
+			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
+			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
+			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
 		)
 
 
