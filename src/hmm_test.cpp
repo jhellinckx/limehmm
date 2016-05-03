@@ -134,25 +134,38 @@ int main(){
 		double casino_precomputed_likelihood = 0.0028;
 		std::vector<std::string> casino_precomputed_viterbi_path_2_states({"fair", "fair", "fair", "fair", "fair", "fair", "fair", "fair"});
 		/* Training casino. */
-		std::vector<std::vector<std::string>> casino_training_sequences_1 = 
-		{{"H", "T", "H"}, {"H", "H", "H", "H"}, {"T", "H", "T", "H", "T"}, 
-		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
-		{"T", "T", "H", "H", "H", "H", "H", "H", "H", "H", "H"}, 
-		{"T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
-		{"T", "T", "T"}};	
-		double precomputed_casino_viterbi_improvement_no_pseudocount = utils::round_double(0.639841864861836, 4);
-		double precomputed_casino_viterbi_improvement_with_pseudocount = utils::round_double(1.7764802457455673, 4);
+		// std::vector<std::vector<std::string>> casino_training_sequences_1 = 
+		// {{"H", "T", "H"}, {"H", "H", "H", "H"}, {"T", "H", "T", "H", "T"}, 
+		// {"T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
+		// {"T", "T", "H", "H", "H", "H", "H", "H", "H", "H", "H"}, 
+		// {"T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H", "T", "H"}, 
+		// {"T", "T", "T"}};	
 
 		std::vector<std::vector<std::string>> casino_training_sequences_2 = 
 		{	{"T", "H", "H", "T"}, {"T", "H", "H", "T"}, {"T", "H", "H", "T"}, 
 			{"T", "H", "T", "H"}, {"T", "T", "T", "T"}, {"T", "T", "T", "T"}, 
 			{"T", "H", "T", "H"}, {"H", "T", "H", "H"}, {"H", "T", "H", "H"}};
 
+		std::vector<std::vector<double>> casino_precomputed_viterbi_trained_transitions = {{1, 0}, {0, 1}};
+		std::vector<double> casino_precomputed_viterbi_trained_pi_begin = {0.7778, 0.2222};
+		std::vector<DiscreteDistribution> casino_precomputed_viterbi_trained_distributions;
+		casino_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"H", 0.3571}, {"T", 0.6429}}));
+		casino_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"H", 0.75}, {"T", 0.25}}));
+		double casino_precomputed_viterbi_improvement = utils::round_double(1.7561325574, 4);
+
+		std::vector<std::vector<double>> casino_precomputed_viterbi_trained_transitions_pc = {{0.9565, 0.0435}, {0.125, 0.875}};
+		std::vector<double> casino_precomputed_viterbi_trained_pi_begin_pc = {0.7273, 0.2727};
+		std::vector<DiscreteDistribution> casino_precomputed_viterbi_trained_distributions_pc;
+		casino_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"H", 0.3571}, {"T", 0.6429}}));
+		casino_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"H", 0.75}, {"T", 0.25}}));
+		double casino_precomputed_viterbi_improvement_pc = utils::round_double(1.69606009321, 4);
+
 		std::vector<std::vector<double>> casino_precomputed_bw_trained_transitions = {{0, 1}, {0.5183, 0.4817}};
 		std::vector<double> casino_precomputed_bw_trained_pi_begin = {0.7128, 0.2872};
 		std::vector<DiscreteDistribution> casino_precomputed_bw_trained_distributions;
 		casino_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"H", 0}, {"T", 1}}));
 		casino_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"H", 0.7450}, {"T", 0.2550}}));
+		double casino_precomputed_bw_improvement = utils::round_double(5.05069902785, 4);
 
 		/* Simple hmm with 3 states emitting nucleobases. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
@@ -191,6 +204,7 @@ int main(){
 		nucleobase_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"A", 0.2482}, {"C", 0.1851}, {"G", 0.1851}, {"T", 0.3816}}));
 		std::vector<double> nucleobase_precomputed_bw_trained_pi_begin = {1, 0, 0};
 		std::vector<double> nucleobase_precomputed_bw_trained_pi_end = {0, 1, 0.1851};
+		double nucleobase_precomputed_bw_improvement = utils::round_double(3.23843686377, 4);
 
 		/* Profile hmm with 10 states. */
 		HiddenMarkovModel profile_10_states_hmm("profile 10 states");
@@ -675,39 +689,67 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi training (casino)",
+			"viterbi training batch of sequences (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_1), 4);
-			ASSERT(viterbi_improvement == precomputed_casino_viterbi_improvement_no_pseudocount);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_2), 4);
+			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
+			exp_all(viterbi_trained_transitions);
+			round_all(viterbi_trained_transitions, 4);
+			std::vector<double> viterbi_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(viterbi_trained_pi_begin);
+			round_all(viterbi_trained_pi_begin, 4);
+			std::vector<DiscreteDistribution> viterbi_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+			}
+			exp_all(viterbi_trained_distributions);
+			round_all(viterbi_trained_distributions, 4);
+			ASSERT(viterbi_improvement == casino_precomputed_viterbi_improvement);
+			ASSERT(viterbi_trained_transitions == casino_precomputed_viterbi_trained_transitions);
+			ASSERT(viterbi_trained_pi_begin == casino_precomputed_viterbi_trained_pi_begin);
+			ASSERT(viterbi_trained_distributions == casino_precomputed_viterbi_trained_distributions);
 		)
 
 		TEST_UNIT(
 			"viterbi training with pseudocounts (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_1, 1.0), 4);
-			ASSERT(viterbi_improvement == precomputed_casino_viterbi_improvement_with_pseudocount);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_2, 1.0), 4);
+			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
+			exp_all(viterbi_trained_transitions);
+			round_all(viterbi_trained_transitions, 4);
+			std::vector<double> viterbi_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(viterbi_trained_pi_begin);
+			round_all(viterbi_trained_pi_begin, 4);
+			std::vector<DiscreteDistribution> viterbi_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+			}
+			exp_all(viterbi_trained_distributions);
+			round_all(viterbi_trained_distributions, 4);
+			ASSERT(viterbi_improvement == casino_precomputed_viterbi_improvement_pc);
+			ASSERT(viterbi_trained_transitions == casino_precomputed_viterbi_trained_transitions_pc);
+			ASSERT(viterbi_trained_pi_begin == casino_precomputed_viterbi_trained_pi_begin_pc);
+			ASSERT(viterbi_trained_distributions == casino_precomputed_viterbi_trained_distributions_pc);
 		)
 
 		TEST_UNIT(
 			"viterbi training with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1
-	), 4);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1), 4);
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_no_pseudocount);
 		)
 
 		TEST_UNIT(
 			"viterbi training with pseudocounts and with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1
-	, 1.0), 4);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1, 1.0), 4);
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_with_pseudocount);
 		)
 
 		TEST_UNIT(
 			"baum-welch training batch of sequences (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			hmm.train_baum_welch(casino_training_sequences_2);
+			double bw_improvement = utils::round_double(hmm.train_baum_welch(casino_training_sequences_2), 4);
 			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
 			exp_all(bw_trained_transitions);
 			round_all(bw_trained_transitions, 4);
@@ -720,6 +762,7 @@ int main(){
 			}
 			exp_all(bw_trained_distributions);
 			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_improvement == casino_precomputed_bw_improvement);
 			ASSERT(bw_trained_transitions == casino_precomputed_bw_trained_transitions);
 			ASSERT(bw_trained_pi_begin == casino_precomputed_bw_trained_pi_begin);
 			ASSERT(bw_trained_distributions == casino_precomputed_bw_trained_distributions);
@@ -728,7 +771,7 @@ int main(){
 		TEST_UNIT(
 			"baum-welch training with end state (nucleobase)",
 			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
-			hmm.train_baum_welch(nucleobase_training_sequences);
+			double bw_improvement = utils::round_double(hmm.train_baum_welch(nucleobase_training_sequences), 4);
 			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
 			exp_all(bw_trained_transitions);
 			round_all(bw_trained_transitions, 4);
@@ -744,6 +787,7 @@ int main(){
 			}
 			exp_all(bw_trained_distributions);
 			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_improvement == nucleobase_precomputed_bw_improvement);
 			ASSERT(bw_trained_transitions == nucleobase_precomputed_bw_trained_transitions);
 			ASSERT(bw_trained_pi_begin == nucleobase_precomputed_bw_trained_pi_begin);
 			ASSERT(bw_trained_pi_end == nucleobase_precomputed_bw_trained_pi_end);
