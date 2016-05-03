@@ -411,9 +411,6 @@ int main(){
 		std::vector<double> profile_precomputed_bw_batch_trained_pi_begin = {0.0186,0.0, 	0.0, 	0.0, 	0.4171, 0.0, 	0.0, 	0.5643, 0.0, 	0.0};
 		std::vector<double> profile_precomputed_bw_batch_trained_pi_end = {0.0,0.0,0.0,1.0,0.0,0.0,0.9566,0.0,0.0,0.0112};
 
-		double precomputed_profile_improvement_no_pseudocount = 84.9318;
-		double precomputed_profile_improvement_with_pseudocount = 78.9441;
-
 		tests_init();
 		
 		/* IEEE 754 floating points are required in order to use std::infinity numeric limit. */
@@ -984,6 +981,7 @@ int main(){
 			ASSERT(bw_trained_distributions == profile_precomputed_bw_batch_trained_distributions);
 		)
 
+		/* Train stochastic EM */
 
 		/* Test fix / free parameters */
 
@@ -993,7 +991,7 @@ int main(){
 
 		/* Test factory */
 
-		/* Train stochastic EM */
+		
 
 		/* Profile HMM */
 

@@ -13,6 +13,7 @@
 #include <utility>	// std::pair
 #include <memory> // std::shared_ptr
 #include <iomanip> // std::setprecision
+#include <tuple>
 #include "constants.hpp"
 #include "state.hpp"
 #include "graph.hpp"
@@ -870,29 +871,30 @@ public:
 
 
 
-	std::pair<std::vector<double>, double> backward_terminate(const std::vector<double>& beta_1, const std::vector<std::string>& sequence){
-		std::vector<double> beta_end(_A.size());
+	std::tuple<std::vector<double>, std::vector<double>, double> backward_terminate(const std::vector<double>& beta_1, const std::vector<std::string>& sequence){
+		std::vector<double> beta_0(_A.size());
 		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-			beta_end[i] = utils::kNegInf;
+			beta_0[i] = utils::kNegInf;
 			/* Consider previous step non-silent states. */
 			for(std::size_t j = 0; j < _silent_states_index; j++){
-				beta_end[i] = utils::sum_log_prob(beta_end[i], beta_1[j] + _A[i][j] + (*_B[j])[sequence[0]]);
+				beta_0[i] = utils::sum_log_prob(beta_0[i], beta_1[j] + _A[i][j] + (*_B[j])[sequence[0]]);
 			}
 			/* Consider current step silent states. */
 			for(std::size_t j = i + 1; j < _A.size(); j++){
-				beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
+				beta_0[i] = utils::sum_log_prob(beta_0[i], beta_0[j] + _A[i][j]);
 			}
 		}
+		std::vector<double> beta_end(_A.size());
 		double log_prob = utils::kNegInf;
 		for(std::size_t i = 0; i < _silent_states_index; ++i){
 			beta_end[i] = _pi_begin[i] + (*_B[i])[sequence[0]] + beta_1[i];
 			log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
 		}
 		for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-			beta_end[i] = _pi_begin[i] +  beta_end[i];
+			beta_end[i] = _pi_begin[i] +  beta_0[i];
 			log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
 		}
-		return std::make_pair(beta_end, log_prob);
+		return std::make_tuple(beta_0, beta_end, log_prob);
 	}
 
 	double log_likelihood(const std::vector<std::string>& sequence, bool do_fwd = true){
@@ -900,7 +902,7 @@ public:
 			return forward_terminate(forward(sequence)).second;
 		}
 		else{
-			return backward_terminate(backward(sequence), sequence).second;
+			return std::get<2>(backward_terminate(backward(sequence), sequence));
 		}
 	}
 
@@ -1906,22 +1908,7 @@ public:
 					next_emission_score.reset();
 				}
 				/* Termination. */
-				std::vector<double> bwd_term = backward_terminate(beta, sequence).first;
-
-				std::vector<double> beta_end(_A.size());
-				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-					beta_end[i] = utils::kNegInf;
-					/* Consider previous step non-silent states. */
-					for(std::size_t j = 0; j < _silent_states_index; j++){
-						beta_end[i] = utils::sum_log_prob(beta_end[i], beta[j] + _A[i][j] + (*_B[j])[sequence[0]]);
-					}
-					/* Consider current step silent states. */
-					for(std::size_t j = i + 1; j < _A.size(); j++){
-						beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
-					}
-				}
-
-				beta = beta_end;
+				std::tie(beta, beta_end, std::ignore) = backward_terminate(beta, sequence);
 
 				/* Compute the transitions scores for silent states paths to the begin state. 
 				This essentially uses the same loop as the first loop in backward_terminate. */
@@ -1984,7 +1971,7 @@ public:
 				/* Begin transitions. */
 				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < previous_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
 					state_id = previous_transition_score.get_state_id_from_begin(free_begin_transition_id);
-					next_transition_score.set_begin_score(0, free_begin_transition_id, bwd_term[state_id]);
+					next_transition_score.set_begin_score(0, free_begin_transition_id, beta_end[state_id]);
 				}
 
 				for(std::size_t m = 0; m < _A.size(); ++m){
