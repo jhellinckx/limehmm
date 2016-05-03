@@ -142,20 +142,17 @@ int main(){
 		{"T", "T", "T"}};	
 		double precomputed_casino_viterbi_improvement_no_pseudocount = utils::round_double(0.639841864861836, 4);
 		double precomputed_casino_viterbi_improvement_with_pseudocount = utils::round_double(1.7764802457455673, 4);
-		double precomputed_casino_bw_improvement_no_pseudocount = utils::round_double(2.6887270225223574);
-
-		double precomputed_casino_bw_improvement_no_pseudocount_2 = utils::round_double(5.05069902785, 4);
 
 		std::vector<std::vector<std::string>> casino_training_sequences_2 = 
 		{	{"T", "H", "H", "T"}, {"T", "H", "H", "T"}, {"T", "H", "H", "T"}, 
 			{"T", "H", "T", "H"}, {"T", "T", "T", "T"}, {"T", "T", "T", "T"}, 
 			{"T", "H", "T", "H"}, {"H", "T", "H", "H"}, {"H", "T", "H", "H"}};
 
-		std::vector<std::vector<std::string>> casino_training_sequences_3 = 
-		{{"T", "H", "T", "T", "T", "H"}};
-
-		std::vector<std::vector<std::string>> casino_training_sequences_4 = 
-		{{"T", "H", "H", "T"}};
+		std::vector<std::vector<double>> casino_precomputed_bw_trained_transitions = {{0, 1}, {0.5183, 0.4817}};
+		std::vector<double> casino_precomputed_bw_trained_pi_begin = {0.7128, 0.2872};
+		std::vector<DiscreteDistribution> casino_precomputed_bw_trained_distributions;
+		casino_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"H", 0}, {"T", 1}}));
+		casino_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"H", 0.7450}, {"T", 0.2550}}));
 
 		/* Simple hmm with 3 states emitting nucleobases. */
 		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
@@ -186,6 +183,15 @@ int main(){
 		std::vector<std::vector<std::string>> nucleobase_training_sequences;
 		nucleobase_training_sequences.push_back(nucleobase_symbols);
 
+		std::vector<std::vector<double>> nucleobase_precomputed_bw_trained_transitions = 
+		{ {0.9167, 0.0833, 0}, {0, 0, 0}, {0, 0, 0.8149} };
+		std::vector<DiscreteDistribution> nucleobase_precomputed_bw_trained_distributions;
+		nucleobase_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"A", 0.3333}, {"C", 0.25}, {"G", 0.1667}, {"T", 0.25}}));
+		nucleobase_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"A", 0}, {"C", 0}, {"G", 0}, {"T", 1}}));
+		nucleobase_precomputed_bw_trained_distributions.push_back(DiscreteDistribution({{"A", 0.2482}, {"C", 0.1851}, {"G", 0.1851}, {"T", 0.3816}}));
+		std::vector<double> nucleobase_precomputed_bw_trained_pi_begin = {1, 0, 0};
+		std::vector<double> nucleobase_precomputed_bw_trained_pi_end = {0, 1, 0.1851};
+
 		/* Profile hmm with 10 states. */
 		HiddenMarkovModel profile_10_states_hmm("profile 10 states");
 		DiscreteDistribution i_d({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
@@ -195,7 +201,7 @@ int main(){
 		State i2 = State("I2", i_d);
 		State i3 = State("I3", i_d);
 		/* Create match states. */
-		State m1 = State("M1", DiscreteDistribution({{"A", 0.95},  {"C", 0.01}, {"G", 0.01},  {"T", 0.02 }}));
+		State m1 = State("M1", DiscreteDistribution({{"A", 0.95},  {"C", 0.01}, {"G", 0.01},  {"T", 0.03 }}));
 		State m2 = State("M2", DiscreteDistribution({{"A", 0.003}, {"C", 0.99}, {"G", 0.003}, {"T", 0.004}}));
 		State m3 = State("M3", DiscreteDistribution({{"A", 0.01},  {"C", 0.01}, {"G", 0.01},  {"T", 0.97 }}));
 		/* Create delete states. */
@@ -212,7 +218,7 @@ int main(){
 		profile_10_states_hmm.add_state(m3);
 		profile_10_states_hmm.add_state(d1);
 		profile_10_states_hmm.add_state(d2);
-		profile_10_states_hmm.add_state(d3);
+		//profile_10_states_hmm.add_state(d3);
 		/* Transitions from match states. */
 		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), m1, 0.9);
 		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), i0, 0.1);
@@ -220,8 +226,8 @@ int main(){
 		profile_10_states_hmm.add_transition(m1, i1, 0.05);
 		profile_10_states_hmm.add_transition(m1, d2, 0.05);
 		profile_10_states_hmm.add_transition(m2, m3, 0.9);
-		profile_10_states_hmm.add_transition(m2, i2, 0.05);
-		profile_10_states_hmm.add_transition(m2, d3, 0.05);
+		profile_10_states_hmm.add_transition(m2, i2, 0.1);
+		//profile_10_states_hmm.add_transition(m2, d3, 0.05);
 		profile_10_states_hmm.add_transition(m3, profile_10_states_hmm.end(), 0.9);
 		profile_10_states_hmm.add_transition(m3, i3, 0.1);
 		/* Transitions from insert states. */
@@ -232,20 +238,20 @@ int main(){
 		profile_10_states_hmm.add_transition(i1, d2, 0.15);
 		profile_10_states_hmm.add_transition(i1, m2, 0.15);
 		profile_10_states_hmm.add_transition(i2, i2, 0.70);
-		profile_10_states_hmm.add_transition(i2, d3, 0.15);
-		profile_10_states_hmm.add_transition(i2, m3, 0.15);
+		//profile_10_states_hmm.add_transition(i2, d3, 0.15);
+		profile_10_states_hmm.add_transition(i2, m3, 0.3);
 		profile_10_states_hmm.add_transition(i3, i3, 0.85);
 		profile_10_states_hmm.add_transition(i3, profile_10_states_hmm.end(), 0.15);
 		/* Transitions from delete states. */
 		profile_10_states_hmm.add_transition(d1, d2, 0.15);
 		profile_10_states_hmm.add_transition(d1, i1, 0.15);
 		profile_10_states_hmm.add_transition(d1, m2, 0.70);
-		profile_10_states_hmm.add_transition(d2, d3, 0.15);
-		profile_10_states_hmm.add_transition(d2, i2, 0.15);
+		//profile_10_states_hmm.add_transition(d2, d3, 0.15);
+		profile_10_states_hmm.add_transition(d2, i2, 0.3);
 		profile_10_states_hmm.add_transition(d2, m3, 0.70);
-		profile_10_states_hmm.add_transition(d3, i3, 0.30);
-		profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
-		profile_10_states_hmm.brew(false);
+		//profile_10_states_hmm.add_transition(d3, i3, 0.30);
+		//profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
+		profile_10_states_hmm.brew();
 		/* Precomputed values. */
 		std::vector<std::vector<std::string>> profile_sequences = {{"A","C","T"}, {"G","G","C"},{"G","A","T"},{"A","C","C"}};
 		double profile_seq1_viterbi_log_likelihood_precomputed = utils::round_double(-0.513244900357, 6);
@@ -266,12 +272,14 @@ int main(){
 		{"A", "C", "G", "T", "G"}, {"A", "T", "T", "T"}, {"T", "A", "C", "C", "C", "T", "C"}, 
 		{"T", "G", "T", "C", "A", "A", "C", "A", "C", "T"}, {"A", "C", "T"}, {"G", "G", "C"},
 		{"G", "A", "T"}, {"A", "C", "C"}};
-		std::vector<std::vector<std::string>> profile_training_sequences = 
+		std::vector<std::vector<std::string>> profile_training_sequences_1 = 
 		{{"A", "C", "T"}, {"A", "C", "T"}, {"A", "C", "C"}, {"A", "C", "T", "C"}, 
 		{"A", "C", "T"}, {"A", "C", "T"}, {"C", "C", "T"}, {"C", "C", "C"}, 
 		{"A", "A", "T"}, {"C", "T"}, {"A", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, 
 		{"C", "T"}, {"C", "T"}, {"C", "T"}, {"A", "C", "T"}, {"A", "C", "T"}, 
 		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
+		std::vector<std::vector<std::string>> profile_training_sequences_2 = 
+		{ {"A", "C", "T", "A", "T"} };
 		double precomputed_profile_improvement_no_pseudocount = 84.9318;
 		double precomputed_profile_improvement_with_pseudocount = 78.9441;
 		std::vector<double> precomputed_observation_likelihood = 
@@ -281,8 +289,7 @@ int main(){
 		-0.505202786679,-7.35302419896,-0.505202786679,-7.35302419896,-7.35302419896,-7.35302419896,
 		-7.35302419896};
 		for(double& likelihood : precomputed_observation_likelihood){ likelihood = utils::round_double(likelihood); }
-		std::vector<std::vector<std::string>>& profile_observation_likelihood_sequences = profile_training_sequences;
-
+		std::vector<std::vector<std::string>>& profile_observation_likelihood_sequences = profile_training_sequences_1;
 
 		tests_init();
 		
@@ -684,67 +691,73 @@ int main(){
 		TEST_UNIT(
 			"viterbi training with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences), 4);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1
+	), 4);
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_no_pseudocount);
 		)
 
 		TEST_UNIT(
 			"viterbi training with pseudocounts and with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences, 1.0), 4);
+			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1
+	, 1.0), 4);
 			ASSERT(viterbi_improvement == precomputed_profile_improvement_with_pseudocount);
-		)
-
-		TEST_UNIT(
-			"baum-welch training 1 sequence (casino)",
-			HiddenMarkovModel hmm = casino_hmm;
-			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
-			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
-			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
-			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			// hmm.train_baum_welch(casino_training_sequences_3);
-			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
-			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
-			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
-			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
 		)
 
 		TEST_UNIT(
 			"baum-welch training batch of sequences (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
-			print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
-			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
-			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
-			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			hmm.train_baum_welch(casino_training_sequences_2, 0.0, 1);
-			print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
-			print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
-			print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
-			print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			hmm.train_baum_welch(casino_training_sequences_2);
+			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
+			exp_all(bw_trained_transitions);
+			round_all(bw_trained_transitions, 4);
+			std::vector<double> bw_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(bw_trained_pi_begin);
+			round_all(bw_trained_pi_begin, 4);
+			std::vector<DiscreteDistribution> bw_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+			}
+			exp_all(bw_trained_distributions);
+			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_trained_transitions == casino_precomputed_bw_trained_transitions);
+			ASSERT(bw_trained_pi_begin == casino_precomputed_bw_trained_pi_begin);
+			ASSERT(bw_trained_distributions == casino_precomputed_bw_trained_distributions);
 		)
 
 		TEST_UNIT(
 			"baum-welch training with end state (nucleobase)",
-			// HiddenMarkovModel hmm = nucleobase_3_states_hmm;
-			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
-			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
-			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
-			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			// hmm.train_baum_welch(nucleobase_training_sequences);
-			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
-			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
-			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);
-			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
+			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
+			hmm.train_baum_welch(nucleobase_training_sequences);
+			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
+			exp_all(bw_trained_transitions);
+			round_all(bw_trained_transitions, 4);
+			std::vector<double> bw_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(bw_trained_pi_begin);
+			round_all(bw_trained_pi_begin, 4);
+			std::vector<double> bw_trained_pi_end = hmm.raw_pi_end();
+			exp_all(bw_trained_pi_end);
+			round_all(bw_trained_pi_end, 4);
+			std::vector<DiscreteDistribution> bw_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+			}
+			exp_all(bw_trained_distributions);
+			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_trained_transitions == nucleobase_precomputed_bw_trained_transitions);
+			ASSERT(bw_trained_pi_begin == nucleobase_precomputed_bw_trained_pi_begin);
+			ASSERT(bw_trained_pi_end == nucleobase_precomputed_bw_trained_pi_end);
+			ASSERT(bw_trained_distributions == nucleobase_precomputed_bw_trained_distributions);
 		)
 
 		TEST_UNIT(
 			"baum-welch training with silent states (profile)",
-			// HiddenMarkovModel hmm = profile_10_states_hmm;
+			 HiddenMarkovModel hmm = profile_10_states_hmm;
 			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), false);
 			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), false);
 			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), false);
 			// print_distributions(hmm.raw_pdfs(), hmm.states_names(), false);
-			// hmm.train_baum_welch(profile_training_sequences);
+			// hmm.train_baum_welch(profile_training_sequences_2, 0.0, 1);
 			// print_transitions(hmm.raw_transitions(), hmm.states_indices(), true);
 			// print_pi_begin(hmm.raw_pi_begin(), hmm.states_names(), true);
 			// print_pi_end(hmm.raw_pi_end(), hmm.states_names(), true);

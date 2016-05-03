@@ -42,6 +42,8 @@ public:
 	virtual bool is_continuous() const { return false; }
 	virtual bool uses_log_probabilities() const { return _log; }
 	virtual void log_probabilities(bool use_log) { _log = use_log; }
+
+	//virtual void round(int precision = global_config::kDoublePrecision);
 	/* Pure virtual methods */
 	/* Get probabilities with operator[] */
 	virtual bool empty() const = 0;
@@ -84,6 +86,12 @@ public:
 	/* Covariant return type */
 	virtual DiscreteDistribution* clone() const {
 		return new DiscreteDistribution(*this);
+	}
+
+	void round(int precision = global_config::kDoublePrecision){
+		for(auto& entry : _distribution){
+			entry.second = utils::round_double(entry.second, precision);
+		}
 	}
 
 	double prob_sum() const {
@@ -182,7 +190,7 @@ public:
 	}
 
 	virtual bool operator==(const DiscreteDistribution& other) const {
-		return (other.name() == this->name()) && (other.uses_log_probabilities() == other.uses_log_probabilities()) && (other._distribution == _distribution);
+		return (uses_log_probabilities() == other.uses_log_probabilities()) && (other._distribution == _distribution);
 	}
 
 	virtual bool operator==(const Distribution& other) const {
