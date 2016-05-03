@@ -1412,31 +1412,31 @@ public:
 		return _A.size(); //Not found sentinel value. Should never happen though.
 	}
 
-	void update_emissions(const EmissionScore& previous_counts, EmissionScore& next_counts, const std::vector<std::size_t>& traceback, std::string symbol){
+	void update_emissions(const EmissionScore& previous_counts, EmissionScore& current_counts, const std::vector<std::size_t>& traceback, std::string symbol){
 		if(!traceback.empty()){
 			std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
 			std::size_t transmitter = last_non_silent_state(traceback);
 			if(transmitter == _A.size()) { return; } // This should not happen. 
 			std::size_t i; std::string gamma;
-			for(std::size_t free_emission_id = 0; free_emission_id < next_counts.num_free_emissions(); ++free_emission_id){
-				i = next_counts.get_state_id(free_emission_id);
-				gamma = next_counts.get_symbol(free_emission_id);
-				next_counts.set_score(m, free_emission_id, previous_counts.score(l, free_emission_id) + delta(transmitter, i) * delta(gamma, symbol));
+			for(std::size_t free_emission_id = 0; free_emission_id < current_counts.num_free_emissions(); ++free_emission_id){
+				i = current_counts.get_state_id(free_emission_id);
+				gamma = current_counts.get_symbol(free_emission_id);
+				current_counts.set_score(m, free_emission_id, previous_counts.score(l, free_emission_id) + delta(transmitter, i) * delta(gamma, symbol));
 			}	
 		}
 	}
 
 	/* Updates all the Tij counts for paths finishing at m by using the previous Tij 
 		counts for paths finishing at l and increments it if i == l and j == m. */
-	void update(const TransitionScore& previous_counts, TransitionScore& next_counts, const std::vector<std::size_t>& traceback){
+	void update(const TransitionScore& previous_counts, TransitionScore& current_counts, const std::vector<std::size_t>& traceback){
 		if(traceback.size() >= 2) {
 			std::size_t l = traceback[0]; std::size_t m = traceback[traceback.size() - 1];
 			std::size_t i,j;
-			next_counts.copy_begin(previous_counts, l, m);
-			for(std::size_t free_transition_id = 0; free_transition_id < next_counts.num_free_transitions(); ++free_transition_id){
-				i = next_counts.get_from_state_id(free_transition_id);
-				j = next_counts.get_to_state_id(free_transition_id);
-				next_counts.set_score(m, free_transition_id, previous_counts.score(l, free_transition_id) + any_of_transitions(traceback, i, j));
+			current_counts.copy_begin(previous_counts, l, m);
+			for(std::size_t free_transition_id = 0; free_transition_id < current_counts.num_free_transitions(); ++free_transition_id){
+				i = current_counts.get_from_state_id(free_transition_id);
+				j = current_counts.get_to_state_id(free_transition_id);
+				current_counts.set_score(m, free_transition_id, previous_counts.score(l, free_transition_id) + any_of_transitions(traceback, i, j));
 			}	
 		}
 	}
@@ -1481,9 +1481,9 @@ public:
 		EmissionScore total_emission_count(_free_emissions, 1);
 		/* This hold the counts for each sequence. */
 		TransitionScore previous_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
-		TransitionScore next_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
+		TransitionScore current_transition_count(_free_transitions, _free_pi_begin, _free_pi_end, _A.size());
 		EmissionScore previous_emission_count(_free_emissions, _A.size());
-		EmissionScore next_emission_count(_free_emissions, _A.size());
+		EmissionScore current_emission_count(_free_emissions, _A.size());
 		unsigned int iteration = 0;
 		/* Use likelihood to determine convergence. */
 		double delta = utils::kInf;
@@ -1494,7 +1494,7 @@ public:
 			&& iteration < max_iterations) {
 			/* Iterate over each sequence and compute the counts. */
 			for(const std::vector<std::string>& sequence : sequences){
-				/* If sequence is empty, go to next sequence. */
+				/* If sequence is empty, go to current sequence. */
 				if(sequence.size() == 0) { continue; }
 				Traceback psi(_A.size());
 				/* The initial step is a special case, since we use initial transition probabilities which
@@ -1503,11 +1503,11 @@ public:
 				/* First iterate only on normal states since emission count are only needed for such states. */
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					std::vector<std::size_t> traceback_m = psi.from(m);
-					update_begin(next_transition_count, traceback_m);
-					update_emissions(previous_emission_count, next_emission_count, traceback_m, sequence[0]);
+					update_begin(current_transition_count, traceback_m);
+					update_emissions(previous_emission_count, current_emission_count, traceback_m, sequence[0]);
 				}
-				previous_transition_count = next_transition_count;
-				previous_emission_count = next_emission_count;
+				previous_transition_count = current_transition_count;
+				previous_emission_count = current_emission_count;
 				/* Resetting the traceback since we only need the traceback of current viterbi step. */
 				psi.reset();
 				/* Main loop for current sequence. */
@@ -1515,28 +1515,28 @@ public:
 					phi = viterbi_step(phi, psi, k, sequence);
 					for(std::size_t m = 0; m < _A.size(); ++m){
 						std::vector<std::size_t> traceback_m = psi.from(m);
-						update(previous_transition_count, next_transition_count, traceback_m);
-						update_emissions(previous_emission_count, next_emission_count, traceback_m, sequence[k]);
+						update(previous_transition_count, current_transition_count, traceback_m);
+						update_emissions(previous_emission_count, current_emission_count, traceback_m, sequence[k]);
 					}
 					psi.reset();
-					previous_transition_count = next_transition_count;
-					previous_emission_count = next_emission_count;
+					previous_transition_count = current_transition_count;
+					previous_emission_count = current_emission_count;
 				}
 				std::size_t max_state_index = viterbi_terminate(phi);
 				/* Test wether the sequence is possible. */
 				if(max_state_index < _A.size()){
 					/* Add 1 to the end transition count of the max state index if model has end state. */
 					if(_is_finite){
-						update_end(next_transition_count, max_state_index);
+						update_end(current_transition_count, max_state_index);
 					}
 					/* Update the total counts. */
-					total_transition_count.add(next_transition_count, 0, max_state_index);
-					total_emission_count.add(next_emission_count, 0, max_state_index);
+					total_transition_count.add(current_transition_count, 0, max_state_index);
+					total_emission_count.add(current_emission_count, 0, max_state_index);
 				}
 				/* Reset counts. */
-				next_transition_count.reset();
+				current_transition_count.reset();
 				previous_transition_count.reset();
-				next_emission_count.reset();
+				current_emission_count.reset();
 				previous_emission_count.reset();
 			}
 			update_model_from_scores(total_transition_count, total_emission_count, transition_pseudocount);
@@ -1795,9 +1795,9 @@ public:
 		EmissionScore total_emission_score(_free_emissions, 1, utils::kNegInf);
 
 		TransitionScore previous_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
-		TransitionScore next_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
+		TransitionScore current_transition_score(_free_transitions, _free_pi_begin, _free_pi_end, _A.size(), utils::kNegInf);
 		EmissionScore previous_emission_score(_free_emissions, _A.size(), utils::kNegInf);
-		EmissionScore next_emission_score(_free_emissions, _A.size(), utils::kNegInf);
+		EmissionScore current_emission_score(_free_emissions, _A.size(), utils::kNegInf);
 		
 		unsigned int iteration = 0;
 		double delta = utils::kInf;
@@ -1812,54 +1812,54 @@ public:
 			&& iteration < max_iterations) {
  			/* Iterate over each sequence and compute the counts. */
 			for(const std::vector<std::string>& sequence : sequences){
-				/* If sequence is empty, go to next sequence. */
+				/* If sequence is empty, go to current sequence. */
 				if(sequence.size() == 0) { continue; }
 
 				/* Initialization. */
 				beta = backward_init();
 				for(std::size_t m = _A.size(); m-- > 0;){
-					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
-						state_id = next_emission_score.get_state_id(free_emission_id);
-						gamma = next_emission_score.get_symbol(free_emission_id);
+					for(std::size_t free_emission_id = 0; free_emission_id < current_emission_score.num_free_emissions(); ++free_emission_id){
+						state_id = current_emission_score.get_state_id(free_emission_id);
+						gamma = current_emission_score.get_symbol(free_emission_id);
 						score = beta[state_id] + log_score(sequence[sequence.size() - 1], gamma) + log_delta(state_id, m);
-						next_emission_score.set_score(m, free_emission_id, score);	
+						current_emission_score.set_score(m, free_emission_id, score);	
 					}
 
 					/* Compute the transitions scores for silent states paths to the end state. Same behavior as in backward_init. */
-					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < current_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						state_id = current_transition_score.get_state_id_to_end(free_end_transition_id);
 						score = _pi_end[state_id] + log_delta(m, state_id);
 						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-							score = utils::sum_log_prob(score, next_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
+							score = utils::sum_log_prob(score, current_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
 						}
-						next_transition_score.set_end_score(m, free_end_transition_id, score);
+						current_transition_score.set_end_score(m, free_end_transition_id, score);
 					}
 
-					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-						i = next_transition_score.get_from_state_id(free_transition_id);
-						j = next_transition_score.get_to_state_id(free_transition_id);
+					for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
+						i = current_transition_score.get_from_state_id(free_transition_id);
+						j = current_transition_score.get_to_state_id(free_transition_id);
 						if(j >= _silent_states_index){
 							score = beta[j] + log_delta(i, m) + _A[m][j];
 							for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-								score = utils::sum_log_prob(score, next_transition_score.score(n, free_transition_id) + _A[m][n]);
+								score = utils::sum_log_prob(score, current_transition_score.score(n, free_transition_id) + _A[m][n]);
 							}
-							next_transition_score.set_score(m, free_transition_id, score);
+							current_transition_score.set_score(m, free_transition_id, score);
 						}
 					}
 				}
 				previous_beta = beta;
-				previous_transition_score = next_transition_score; 
-				previous_emission_score = next_emission_score;
-				next_transition_score.reset();
-				next_emission_score.reset();
+				previous_transition_score = current_transition_score; 
+				previous_emission_score = current_emission_score;
+				current_transition_score.reset();
+				current_emission_score.reset();
 				/* Recurrence. */
 				for(std::size_t t = sequence.size() - 1; t-- > 0;){
 					beta = backward_step(previous_beta, sequence, t);
 					for(std::size_t m = _A.size(); m-- > 0;){
 						/* Compute transitions scores for current step. */
-						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-							i = next_transition_score.get_from_state_id(free_transition_id);
-							j = next_transition_score.get_to_state_id(free_transition_id);
+						for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
+							i = current_transition_score.get_from_state_id(free_transition_id);
+							j = current_transition_score.get_to_state_id(free_transition_id);
 							score = (j < _silent_states_index) ? previous_beta[j] + _A[m][j] + (*_B[j])[sequence[t + 1]] + log_delta(i, m) : beta[j] + _A[m][j] + log_delta(i, m);
 							/* Consider previous step non-silent states. */
 							for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1867,13 +1867,13 @@ public:
 							}
 							/* Consider current step silent states. */
 							for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-								score = utils::sum_log_prob(score,  next_transition_score.score(n, free_transition_id) + _A[m][n]);
+								score = utils::sum_log_prob(score,  current_transition_score.score(n, free_transition_id) + _A[m][n]);
 							}
-							next_transition_score.set_score(m, free_transition_id, score);
+							current_transition_score.set_score(m, free_transition_id, score);
 						}
 						/* Compute end transitions scores. */
-						for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-							state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+						for(std::size_t free_end_transition_id = 0; free_end_transition_id < current_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+							state_id = current_transition_score.get_state_id_to_end(free_end_transition_id);
 							score = utils::kNegInf;
 							/* Consider previous step non-silent states. */
 							for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1881,14 +1881,14 @@ public:
 							}
 							/* Consider current step silent states. */
 							for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-								score = utils::sum_log_prob(score,  next_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
+								score = utils::sum_log_prob(score,  current_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
 							}
-							next_transition_score.set_end_score(m, free_end_transition_id, score);
+							current_transition_score.set_end_score(m, free_end_transition_id, score);
 						}
 						/* Compute emissions score for current step. */
-						for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
-							state_id = next_emission_score.get_state_id(free_emission_id);
-							gamma = next_emission_score.get_symbol(free_emission_id);
+						for(std::size_t free_emission_id = 0; free_emission_id < current_emission_score.num_free_emissions(); ++free_emission_id){
+							state_id = current_emission_score.get_state_id(free_emission_id);
+							gamma = current_emission_score.get_symbol(free_emission_id);
 							score = beta[m] + log_score(sequence[t], gamma) + log_delta(m, state_id);
 							/* Consider previous step non-silent states. */
 							for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1896,16 +1896,16 @@ public:
 							}
 							/* Consider current step silent states. */
 							for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-								score = utils::sum_log_prob(score,  next_emission_score.score(n, free_emission_id) + _A[m][n]);
+								score = utils::sum_log_prob(score,  current_emission_score.score(n, free_emission_id) + _A[m][n]);
 							}
-							next_emission_score.set_score(m, free_emission_id, score);
+							current_emission_score.set_score(m, free_emission_id, score);
 						}
 					}
 					previous_beta = beta;
-					previous_transition_score = next_transition_score;
-					previous_emission_score = next_emission_score;
-					next_transition_score.reset();
-					next_emission_score.reset();
+					previous_transition_score = current_transition_score;
+					previous_emission_score = current_emission_score;
+					current_transition_score.reset();
+					current_emission_score.reset();
 				}
 				/* Termination. */
 				std::tie(beta, beta_end, std::ignore) = backward_terminate(beta, sequence);
@@ -1913,9 +1913,9 @@ public:
 				/* Compute the transitions scores for silent states paths to the begin state. 
 				This essentially uses the same loop as the first loop in backward_terminate. */
 				for(std::size_t m = _A.size(); m-- > _silent_states_index;){
-					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-						i = next_transition_score.get_from_state_id(free_transition_id);
-						j = next_transition_score.get_to_state_id(free_transition_id);
+					for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
+						i = current_transition_score.get_from_state_id(free_transition_id);
+						j = current_transition_score.get_to_state_id(free_transition_id);
 						score = (j < _silent_states_index) ? previous_beta[j] + _A[m][j] + (*_B[j])[sequence[0]] + log_delta(i, m) : beta[j] + _A[m][j] + log_delta(i, m);
 						/* Consider previous step non-silent states. */
 						for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1923,12 +1923,12 @@ public:
 						}
 						/* Consider current step silent states. */
 						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-							score = utils::sum_log_prob(score,  next_transition_score.score(n, free_transition_id) + _A[m][n]);
+							score = utils::sum_log_prob(score,  current_transition_score.score(n, free_transition_id) + _A[m][n]);
 						}
-						next_transition_score.set_score(m, free_transition_id, score);
+						current_transition_score.set_score(m, free_transition_id, score);
 					}
-					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < current_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						state_id = current_transition_score.get_state_id_to_end(free_end_transition_id);
 						score = utils::kNegInf;
 						/* Consider previous step non-silent states. */
 						for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1936,13 +1936,13 @@ public:
 						}
 						/* Consider current step silent states. */
 						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-							score = utils::sum_log_prob(score,  next_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
+							score = utils::sum_log_prob(score,  current_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
 						}
-						next_transition_score.set_end_score(m, free_end_transition_id, score);
+						current_transition_score.set_end_score(m, free_end_transition_id, score);
 					}
-					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
-						state_id = next_emission_score.get_state_id(free_emission_id);
-						gamma = next_emission_score.get_symbol(free_emission_id);
+					for(std::size_t free_emission_id = 0; free_emission_id < current_emission_score.num_free_emissions(); ++free_emission_id){
+						state_id = current_emission_score.get_state_id(free_emission_id);
+						gamma = current_emission_score.get_symbol(free_emission_id);
 						score = utils::kNegInf;
 						/* Consider previous step non-silent states. */
 						for(std::size_t n = 0; n < _silent_states_index; ++n){
@@ -1950,54 +1950,54 @@ public:
 						}
 						/* Consider current step silent states. */
 						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-							score = utils::sum_log_prob(score,  next_emission_score.score(n, free_emission_id) + _A[m][n]);
+							score = utils::sum_log_prob(score,  current_emission_score.score(n, free_emission_id) + _A[m][n]);
 						}
-						next_emission_score.set_score(m, free_emission_id, score);
+						current_emission_score.set_score(m, free_emission_id, score);
 					}
 
 				}
 				for(std::size_t m = 0; m < _silent_states_index; ++m){
-					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-						next_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id));
+					for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
+						current_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id));
 					}
-					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						next_transition_score.set_end_score(m, free_end_transition_id, previous_transition_score.score_end(m, free_end_transition_id));
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < current_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						current_transition_score.set_end_score(m, free_end_transition_id, previous_transition_score.score_end(m, free_end_transition_id));
 					}
 					for(std::size_t free_emission_id = 0; free_emission_id < previous_emission_score.num_free_emissions(); ++free_emission_id){
-						next_emission_score.set_score(m, free_emission_id, previous_emission_score.score(m, free_emission_id));
+						current_emission_score.set_score(m, free_emission_id, previous_emission_score.score(m, free_emission_id));
 					}
 				}
 
 				/* Begin transitions. */
 				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < previous_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
 					state_id = previous_transition_score.get_state_id_from_begin(free_begin_transition_id);
-					next_transition_score.set_begin_score(0, free_begin_transition_id, beta_end[state_id]);
+					current_transition_score.set_begin_score(0, free_begin_transition_id, beta_end[state_id]);
 				}
 
 				for(std::size_t m = 0; m < _A.size(); ++m){
 					score = (m < _silent_states_index) ? _pi_begin[m] + (*_B[m])[sequence[0]] :  _pi_begin[m];
-					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-						next_transition_score.set_score(m, free_transition_id, next_transition_score.score(m, free_transition_id) + score);
+					for(std::size_t free_transition_id = 0; free_transition_id < current_transition_score.num_free_transitions(); ++free_transition_id){
+						current_transition_score.set_score(m, free_transition_id, current_transition_score.score(m, free_transition_id) + score);
 					}
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < previous_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						next_transition_score.set_end_score(m, free_end_transition_id, next_transition_score.score_end(m, free_end_transition_id) + score);
+						current_transition_score.set_end_score(m, free_end_transition_id, current_transition_score.score_end(m, free_end_transition_id) + score);
 					}
 					for(std::size_t free_emission_id = 0; free_emission_id < previous_emission_score.num_free_emissions(); ++free_emission_id){
-						next_emission_score.set_score(m, free_emission_id, next_emission_score.score(m, free_emission_id) + score);
+						current_emission_score.set_score(m, free_emission_id, current_emission_score.score(m, free_emission_id) + score);
 					}
 				}
 
 				/* Update total scores. */
 				double seq_log_likelihood = log_likelihood(sequence);
 				/* Transitions. */
-				log_update_transition_score(next_transition_score, total_transition_score, seq_log_likelihood);
+				log_update_transition_score(current_transition_score, total_transition_score, seq_log_likelihood);
 
 				/* Emissions. */
-				log_update_emission_score(next_emission_score, total_emission_score, seq_log_likelihood);
+				log_update_emission_score(current_emission_score, total_emission_score, seq_log_likelihood);
 
-				next_transition_score.reset();
+				current_transition_score.reset();
 				previous_transition_score.reset();
-				next_emission_score.reset();
+				current_emission_score.reset();
 				previous_emission_score.reset();
 			}
 
