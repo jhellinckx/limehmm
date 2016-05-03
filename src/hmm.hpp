@@ -872,27 +872,27 @@ public:
 
 	std::pair<std::vector<double>, double> backward_terminate(const std::vector<double>& beta_1, const std::vector<std::string>& sequence){
 		std::vector<double> beta_end(_A.size());
-			for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
-				beta_end[i] = utils::kNegInf;
-				/* Consider previous step non-silent states. */
-				for(std::size_t j = 0; j < _silent_states_index; j++){
-					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_1[j] + _A[i][j] + (*_B[j])[sequence[0]]);
-				}
-				/* Consider current step silent states. */
-				for(std::size_t j = i + 1; j < _A.size(); j++){
-					beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
-				}
+		for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+			beta_end[i] = utils::kNegInf;
+			/* Consider previous step non-silent states. */
+			for(std::size_t j = 0; j < _silent_states_index; j++){
+				beta_end[i] = utils::sum_log_prob(beta_end[i], beta_1[j] + _A[i][j] + (*_B[j])[sequence[0]]);
 			}
-			double log_prob = utils::kNegInf;
-			for(std::size_t i = 0; i < _silent_states_index; ++i){
-				beta_end[i] = _pi_begin[i] + (*_B[i])[sequence[0]] + beta_1[i];
-				log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
+			/* Consider current step silent states. */
+			for(std::size_t j = i + 1; j < _A.size(); j++){
+				beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
 			}
-			for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
-				beta_end[i] = _pi_begin[i] +  beta_end[i];
-				log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
-			}
-			return std::make_pair(beta_end, log_prob);
+		}
+		double log_prob = utils::kNegInf;
+		for(std::size_t i = 0; i < _silent_states_index; ++i){
+			beta_end[i] = _pi_begin[i] + (*_B[i])[sequence[0]] + beta_1[i];
+			log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
+		}
+		for(std::size_t i = _silent_states_index; i < _A.size(); ++i){
+			beta_end[i] = _pi_begin[i] +  beta_end[i];
+			log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
+		}
+		return std::make_pair(beta_end, log_prob);
 	}
 
 	double log_likelihood(const std::vector<std::string>& sequence, bool do_fwd = true){
@@ -1802,9 +1802,7 @@ public:
 		double initial_likelihood = log_likelihood(sequences);
 		double previous_likelihood = initial_likelihood;
 		double current_likelihood;
-		std::vector<double> previous_beta;
-		std::vector<double> beta;
-		std::vector<double> alpha_1;
+		std::vector<double> previous_beta, beta, beta_end;
 		std::size_t i, j, state_id;
 		double score;
 		std::string gamma;
@@ -1824,26 +1822,29 @@ public:
 						score = beta[state_id] + log_score(sequence[sequence.size() - 1], gamma) + log_delta(state_id, m);
 						next_emission_score.set_score(m, free_emission_id, score);	
 					}
+
+					/* Compute the transitions scores for silent states paths to the end state. Same behavior as in backward_init. */
 					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
 						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
-						score = beta[state_id] + log_delta(m, state_id);
-						/* Consider current step silent states. */
+						score = _pi_end[state_id] + log_delta(m, state_id);
+						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
+							score = utils::sum_log_prob(score, next_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
+						}
 						next_transition_score.set_end_score(m, free_end_transition_id, score);
 					}
 
-					// for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-					// 	i = next_transition_score.get_from_state_id(free_transition_id);
-					// 	j = next_transition_score.get_to_state_id(free_transition_id);
-					// 	if(j >= _silent_states_index){
-					// 		score = beta[j] + log_delta(i, m) + _A[m][j];
-					// 		for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
-					// 			score = utils::sum_log_prob(score, next_transition_score.score(n, free_transition_id) + _A[m][n]);
-					// 		}
-					// 		next_transition_score.set_score(m, free_transition_id, score);
-					// 	}
-					// }
+					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
+						i = next_transition_score.get_from_state_id(free_transition_id);
+						j = next_transition_score.get_to_state_id(free_transition_id);
+						if(j >= _silent_states_index){
+							score = beta[j] + log_delta(i, m) + _A[m][j];
+							for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
+								score = utils::sum_log_prob(score, next_transition_score.score(n, free_transition_id) + _A[m][n]);
+							}
+							next_transition_score.set_score(m, free_transition_id, score);
+						}
+					}
 				}
-				//print_all_scores(next_transition_score);
 				previous_beta = beta;
 				previous_transition_score = next_transition_score; 
 				previous_emission_score = next_emission_score;
@@ -1905,14 +1906,25 @@ public:
 					next_emission_score.reset();
 				}
 				/* Termination. */
-				alpha_1 = forward_init(sequence);
 				std::vector<double> bwd_term = backward_terminate(beta, sequence).first;
-				/* Begin transitions. */
-				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < previous_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
-					state_id = previous_transition_score.get_state_id_from_begin(free_begin_transition_id);
-					next_transition_score.set_begin_score(0, free_begin_transition_id, bwd_term[state_id]);
+
+				std::vector<double> beta_end(_A.size());
+				for(std::size_t i = _A.size() - 1; i >= _silent_states_index; --i){
+					beta_end[i] = utils::kNegInf;
+					/* Consider previous step non-silent states. */
+					for(std::size_t j = 0; j < _silent_states_index; j++){
+						beta_end[i] = utils::sum_log_prob(beta_end[i], beta[j] + _A[i][j] + (*_B[j])[sequence[0]]);
+					}
+					/* Consider current step silent states. */
+					for(std::size_t j = i + 1; j < _A.size(); j++){
+						beta_end[i] = utils::sum_log_prob(beta_end[i], beta_end[j] + _A[i][j]);
+					}
 				}
 
+				beta = beta_end;
+
+				/* Compute the transitions scores for silent states paths to the begin state. 
+				This essentially uses the same loop as the first loop in backward_terminate. */
 				for(std::size_t m = _A.size(); m-- > _silent_states_index;){
 					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
 						i = next_transition_score.get_from_state_id(free_transition_id);
@@ -1928,43 +1940,73 @@ public:
 						}
 						next_transition_score.set_score(m, free_transition_id, score);
 					}
-				}
-
-				for(std::size_t m = 0; m < _A.size(); ++m){
-					if(m < _silent_states_index){
-						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-							next_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id) + _pi_begin[m] + (*_B[m])[sequence[0]]);
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						state_id = next_transition_score.get_state_id_to_end(free_end_transition_id);
+						score = utils::kNegInf;
+						/* Consider previous step non-silent states. */
+						for(std::size_t n = 0; n < _silent_states_index; ++n){
+							score = utils::sum_log_prob(score, previous_transition_score.score_end(n, free_end_transition_id) + _A[m][n] + (*_B[n])[sequence[0]]);
 						}
-					}
-					else{
-						for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
-							next_transition_score.set_score(m, free_transition_id, next_transition_score.score(m, free_transition_id) + _pi_begin[m]);
+						/* Consider current step silent states. */
+						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
+							score = utils::sum_log_prob(score,  next_transition_score.score_end(n, free_end_transition_id) + _A[m][n]);
 						}
+						next_transition_score.set_end_score(m, free_end_transition_id, score);
+					}
+					for(std::size_t free_emission_id = 0; free_emission_id < next_emission_score.num_free_emissions(); ++free_emission_id){
+						state_id = next_emission_score.get_state_id(free_emission_id);
+						gamma = next_emission_score.get_symbol(free_emission_id);
+						score = utils::kNegInf;
+						/* Consider previous step non-silent states. */
+						for(std::size_t n = 0; n < _silent_states_index; ++n){
+							score = utils::sum_log_prob(score, previous_emission_score.score(n, free_emission_id) + _A[m][n] + (*_B[n])[sequence[0]]);
+						}
+						/* Consider current step silent states. */
+						for(std::size_t n = std::max(m + 1, _silent_states_index); n < _A.size(); ++n){
+							score = utils::sum_log_prob(score,  next_emission_score.score(n, free_emission_id) + _A[m][n]);
+						}
+						next_emission_score.set_score(m, free_emission_id, score);
 					}
 
 				}
-
-				for(std::size_t m = 0; m < _A.size(); ++m){
-					/* Mid transitions. */
-					// for(std::size_t free_transition_id = 0; free_transition_id < previous_transition_score.num_free_transitions(); ++free_transition_id){
-					// 	next_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id));						
-					// }
-					/* End transitions. */
-					for(std::size_t free_end_transition_id = 0; free_end_transition_id < previous_transition_score.num_free_end_transitions(); ++free_end_transition_id){
-						next_transition_score.set_end_score(m, free_end_transition_id, previous_transition_score.score_end(m, free_end_transition_id) + alpha_1[m]);
+				for(std::size_t m = 0; m < _silent_states_index; ++m){
+					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
+						next_transition_score.set_score(m, free_transition_id, previous_transition_score.score(m, free_transition_id));
 					}
-					/* Emissions. */
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < next_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						next_transition_score.set_end_score(m, free_end_transition_id, previous_transition_score.score_end(m, free_end_transition_id));
+					}
 					for(std::size_t free_emission_id = 0; free_emission_id < previous_emission_score.num_free_emissions(); ++free_emission_id){
-						previous_emission_score.set_score(m, free_emission_id, previous_emission_score.score(m, free_emission_id) + alpha_1[m]);
+						next_emission_score.set_score(m, free_emission_id, previous_emission_score.score(m, free_emission_id));
 					}
 				}
+
+				/* Begin transitions. */
+				for(std::size_t free_begin_transition_id = 0; free_begin_transition_id < previous_transition_score.num_free_begin_transitions(); ++free_begin_transition_id){
+					state_id = previous_transition_score.get_state_id_from_begin(free_begin_transition_id);
+					next_transition_score.set_begin_score(0, free_begin_transition_id, bwd_term[state_id]);
+				}
+
+				for(std::size_t m = 0; m < _A.size(); ++m){
+					score = (m < _silent_states_index) ? _pi_begin[m] + (*_B[m])[sequence[0]] :  _pi_begin[m];
+					for(std::size_t free_transition_id = 0; free_transition_id < next_transition_score.num_free_transitions(); ++free_transition_id){
+						next_transition_score.set_score(m, free_transition_id, next_transition_score.score(m, free_transition_id) + score);
+					}
+					for(std::size_t free_end_transition_id = 0; free_end_transition_id < previous_transition_score.num_free_end_transitions(); ++free_end_transition_id){
+						next_transition_score.set_end_score(m, free_end_transition_id, next_transition_score.score_end(m, free_end_transition_id) + score);
+					}
+					for(std::size_t free_emission_id = 0; free_emission_id < previous_emission_score.num_free_emissions(); ++free_emission_id){
+						next_emission_score.set_score(m, free_emission_id, next_emission_score.score(m, free_emission_id) + score);
+					}
+				}
+
 				/* Update total scores. */
 				double seq_log_likelihood = log_likelihood(sequence);
 				/* Transitions. */
 				log_update_transition_score(next_transition_score, total_transition_score, seq_log_likelihood);
 
 				/* Emissions. */
-				log_update_emission_score(previous_emission_score, total_emission_score, seq_log_likelihood);
+				log_update_emission_score(next_emission_score, total_emission_score, seq_log_likelihood);
 
 				next_transition_score.reset();
 				previous_transition_score.reset();

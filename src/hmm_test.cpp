@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <utility>
+#include <tuple> // std::tie
 #include "utils.hpp"
 #include "hmm.hpp" // tested hmm library
 
@@ -232,16 +233,17 @@ int main(){
 		profile_10_states_hmm.add_state(m3);
 		profile_10_states_hmm.add_state(d1);
 		profile_10_states_hmm.add_state(d2);
-		//profile_10_states_hmm.add_state(d3);
+		profile_10_states_hmm.add_state(d3);
 		/* Transitions from match states. */
-		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), m1, 0.9);
+		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), m1, 0.5);
 		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), i0, 0.1);
+		profile_10_states_hmm.add_transition(profile_10_states_hmm.begin(), d1, 0.4);
 		profile_10_states_hmm.add_transition(m1, m2, 0.9);
 		profile_10_states_hmm.add_transition(m1, i1, 0.05);
 		profile_10_states_hmm.add_transition(m1, d2, 0.05);
 		profile_10_states_hmm.add_transition(m2, m3, 0.9);
-		profile_10_states_hmm.add_transition(m2, i2, 0.1);
-		//profile_10_states_hmm.add_transition(m2, d3, 0.05);
+		profile_10_states_hmm.add_transition(m2, i2, 0.05);
+		profile_10_states_hmm.add_transition(m2, d3, 0.05);
 		profile_10_states_hmm.add_transition(m3, profile_10_states_hmm.end(), 0.9);
 		profile_10_states_hmm.add_transition(m3, i3, 0.1);
 		/* Transitions from insert states. */
@@ -252,40 +254,61 @@ int main(){
 		profile_10_states_hmm.add_transition(i1, d2, 0.15);
 		profile_10_states_hmm.add_transition(i1, m2, 0.15);
 		profile_10_states_hmm.add_transition(i2, i2, 0.70);
-		//profile_10_states_hmm.add_transition(i2, d3, 0.15);
-		profile_10_states_hmm.add_transition(i2, m3, 0.3);
+		profile_10_states_hmm.add_transition(i2, d3, 0.15);
+		profile_10_states_hmm.add_transition(i2, m3, 0.15);
 		profile_10_states_hmm.add_transition(i3, i3, 0.85);
 		profile_10_states_hmm.add_transition(i3, profile_10_states_hmm.end(), 0.15);
 		/* Transitions from delete states. */
 		profile_10_states_hmm.add_transition(d1, d2, 0.15);
 		profile_10_states_hmm.add_transition(d1, i1, 0.15);
 		profile_10_states_hmm.add_transition(d1, m2, 0.70);
-		//profile_10_states_hmm.add_transition(d2, d3, 0.15);
-		profile_10_states_hmm.add_transition(d2, i2, 0.3);
+		profile_10_states_hmm.add_transition(d2, d3, 0.15);
+		profile_10_states_hmm.add_transition(d2, i2, 0.15);
 		profile_10_states_hmm.add_transition(d2, m3, 0.70);
-		//profile_10_states_hmm.add_transition(d3, i3, 0.30);
-		//profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
+		profile_10_states_hmm.add_transition(d3, i3, 0.30);
+		profile_10_states_hmm.add_transition(d3, profile_10_states_hmm.end(), 0.70);
 		profile_10_states_hmm.brew();
+
 		/* Precomputed values. */
-		std::vector<std::vector<std::string>> profile_sequences = {{"A","C","T"}, {"G","G","C"},{"G","A","T"},{"A","C","C"}};
-		double profile_seq1_viterbi_log_likelihood_precomputed = utils::round_double(-0.513244900357, 6);
-		double profile_seq2_viterbi_log_likelihood_precomputed = utils::round_double(-11.0481012413, 6);
-		double profile_seq3_viterbi_log_likelihood_precomputed = utils::round_double(-9.12551967402, 6);
-		double profile_seq4_viterbi_log_likelihood_precomputed = utils::round_double(-5.08795587886, 6);
-		std::vector<std::string> profile_seq1_viterbi_path_precomputed({"M1", "M2", "M3"});
-		std::vector<std::string> profile_seq2_viterbi_path_precomputed({"I0", "I0", "D1", "M2", "D3"});
-		std::vector<std::string> profile_seq3_viterbi_path_precomputed({"I0", "M1", "D2", "M3"});
-		std::vector<std::string> profile_seq4_viterbi_path_precomputed({"M1", "M2", "M3"});
-		std::vector<double> precomputed_viterbi_log_likelihoods = {-5.406181012423981, -10.88681993576597, 
-		-3.6244718790494277, -3.644880750680635, -10.674332964640293, -10.393824835172445, -8.67126440174503, 
-		-16.903451796110275, -16.451699654050792, -0.5132449003570658, -11.048101241343396, -9.125519674022627, 
-		-5.0879558788604475};
-		for(double& likelihood : precomputed_viterbi_log_likelihoods){ likelihood = utils::round_double(likelihood); }
+
+		/* Profile viterbi decode */
 		std::vector<std::vector<std::string>> profile_viterbi_decode_sequences = 
 		{{"A"}, {"G", "A"}, {"A", "C"}, {"A", "T"}, {"A", "T", "C", "C"}, 
 		{"A", "C", "G", "T", "G"}, {"A", "T", "T", "T"}, {"T", "A", "C", "C", "C", "T", "C"}, 
 		{"T", "G", "T", "C", "A", "A", "C", "A", "C", "T"}, {"A", "C", "T"}, {"G", "G", "C"},
 		{"G", "A", "T"}, {"A", "C", "C"}};
+
+		std::vector<double> precomputed_profile_viterbi_log_likelihoods = 
+		{	-5.99396767733, -10.0935892966, -4.21225854395, -4.23266741558, -11.2621196295,
+			-10.9816115001, -9.25905106665, -16.5306107603, -16.4516996541, -1.10103156526,
+			 -11.0481012413, -8.33228903491, -5.67574254376};
+		for(double& likelihood : precomputed_profile_viterbi_log_likelihoods){ likelihood = utils::round_double(likelihood, 4); }
+		
+		std::vector<std::vector<std::string>> precomputed_profile_viterbi_paths =
+		{ 	{"M1", "D2", "D3"},
+			{"D1", "D2", "I2", "I2", "D3"},
+			{"M1", "M2", "D3"},
+			{"M1", "D2", "M3"},
+			{"M1", "D2", "M3", "I3", "I3"},
+			{"M1", "M2", "I2", "I2", "I2", "D3"},
+			{"M1", "I1", "I1", "D2", "M3"},
+			{"D1", "D2", "M3", "I3", "I3", "I3", "I3", "I3", "I3"},
+			{"I0", "I0", "I0", "I0", "I0", "I0", "I0", "M1", "M2", "M3"},
+			{"M1", "M2", "M3"},
+			{"I0", "I0", "D1", "M2", "D3"},
+			{"D1", "I1", "I1", "D2", "M3"},
+			{"M1", "M2", "M3"}};
+			
+		/* Profile observation probability */
+		std::vector<double> precomputed_profile_observation_likelihoods = 
+		{	-5.64533551635, -8.56462831313, -4.16525171411, -4.03902020142, 
+			-9.66057354724, -10.0430248815, -8.32206040729, -14.7638542203, 
+			-16.0844468561, -1.08398911807, -9.61825642651, -7.50353655895, 
+			-5.42134753659};
+		for(double& likelihood : precomputed_profile_observation_likelihoods){ likelihood = utils::round_double(likelihood, 4); }
+		std::vector<std::vector<std::string>>& profile_observation_likelihood_sequences = profile_viterbi_decode_sequences;
+
+		/* Profile training */
 		std::vector<std::vector<std::string>> profile_training_sequences_1 = 
 		{{"A", "C", "T"}, {"A", "C", "T"}, {"A", "C", "C"}, {"A", "C", "T", "C"}, 
 		{"A", "C", "T"}, {"A", "C", "T"}, {"C", "C", "T"}, {"C", "C", "C"}, 
@@ -294,16 +317,102 @@ int main(){
 		{"C", "T"}, {"A", "C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}, {"C", "T"}};
 		std::vector<std::vector<std::string>> profile_training_sequences_2 = 
 		{ {"A", "C", "T", "A", "T"} };
+
+		/* Viterbi */
+		std::vector<std::vector<double>> profile_precomputed_viterbi_trained_transitions = 
+		{	{0.7, 0.0, 0.0, 	0.0, 	0.15, 	0.0, 	0.0, 	 0.15, 	0.0, 	0.0}, 
+			{0.0, 0.7, 0.0, 	0.0, 	0.0,	0.15, 	0.0, 	 0.0, 	0.15, 	0.0}, 
+			{0.0, 0.0, 0.5, 	0.0, 	0.0,	0.0,	0.0, 	 0.0, 	0.0, 	0.5}, 
+			{0.0, 0.0, 0.0, 	0.0, 	0.0,	0.0, 	0.0, 	 0.0, 	0.0, 	0.0}, 
+			{0.0, 0.0, 0.0, 	0.0, 	0.0,	0.9167, 0.0, 	 0.0, 	0.0833, 0.0}, 
+			{0.0, 0.0, 0.0417, 	0.0, 	0.0,	0.0, 	0.9583,	 0.0, 	0.0, 	0.0}, 
+			{0.0, 0.0, 0.0, 	0.0417, 0.0,	0.0, 	0.0, 	 0.0, 	0.0, 	0.0}, 
+			{0.0, 0.0, 0.0, 	0.0, 	0.0, 	1.0, 	0.0, 	 0.0, 	0.0, 	0.0}, 
+			{0.0, 0.0, 0.0, 	0.0, 	0.0, 	0.0, 	1.0, 	 0.0, 	0.0, 	0.0}, 
+			{0.0, 0.0, 0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	 0.0, 	0.0, 	0.0}};
+		std::vector<DiscreteDistribution> profile_precomputed_viterbi_trained_distributions;
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.25  }, {"C", 0.25	 }, {"T", 0.25	}, {"G", 0.25}}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.25  }, {"C", 0.25	 }, {"T", 0.25	}, {"G", 0.25}}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0	  }, {"C", 1.0	 }, {"T", 0.0	}, {"G", 0.0 }}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0	  }, {"C", 1.0	 }, {"T", 0.0	}, {"G", 0.0 }}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.9167}, {"C", 0.0833}, {"T", 0.0	}, {"G", 0.0 }}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0417}, {"C", 0.9583}, {"T", 0.0	}, {"G", 0.0 }}));
+		profile_precomputed_viterbi_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0	  }, {"C", 0.0417}, {"T", 0.9583}, {"G", 0.0 }}));
+		std::vector<double> profile_precomputed_viterbi_trained_pi_begin = {0.0, 0.0, 0.0, 	0.0, 	0.48, 	0.0, 	0.0,  0.52, 	0.0, 	0.0};
+		std::vector<double> profile_precomputed_viterbi_trained_pi_end = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.9583, 0.0, 0.0, 1.0};
+		double profile_precomputed_viterbi_improvement = utils::round_double(19.9265503604, 4);
+
+
+		std::vector<std::vector<double>> profile_precomputed_viterbi_trained_transitions_pc = 
+		{	{0.3333,0.0, 	0.0, 	0.0, 	0.3333, 0.0, 	0.0, 	 0.3333,0.0, 	0.0}, 
+			{0.0, 	0.3333, 0.0, 	0.0, 	0.0, 	0.3333, 0.0, 	 0.0, 	0.3333, 0.0}, 
+			{0.0, 	0.0, 	0.4, 	0.0, 	0.0, 	0.0, 	0.2, 	 0.0, 	0.0, 	0.4}, 
+			{0.0, 	0.0, 	0.0, 	0.3333, 0.0, 	0.0, 	0.0, 	 0.0, 	0.0, 	0.0}, 
+			{0.0, 	0.0667, 0.0, 	0.0, 	0.0, 	0.8, 	0.0, 	 0.0, 	0.1333, 0.0}, 
+			{0.0, 	0.0, 	0.0741, 0.0, 	0.0, 	0.0, 	0.8889,	 0.0, 	0.0, 	0.037}, 
+			{0.0, 	0.0, 	0.0, 	0.0769, 0.0, 	0.0, 	0.0, 	 0.0, 	0.0, 	0.0},
+			{0.0, 	0.0625, 0.0, 	0.0, 	0.0, 	0.875, 	0.0, 	 0.0, 	0.0625, 0.0}, 
+			{0.0, 	0.0, 	0.25, 	0.0, 	0.0, 	0.0, 	0.5, 	 0.0, 	0.0, 	0.25}, 
+			{0.0, 	0.0, 	0.0, 	0.3333, 0.0, 	0.0, 	0.0, 	 0.0, 	0.0, 	0.0}};
+		std::vector<DiscreteDistribution> profile_precomputed_viterbi_trained_distributions_pc;
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.25},	 {"C", 0.25},	 {"T", 0.25},	 {"G", 0.25}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.25},	 {"C", 0.25},	 {"T", 0.25},	 {"G", 0.25}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.0},	 {"C", 1.0},	 {"T", 0.0},	 {"G", 0.0}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.0},	 {"C", 1.0},	 {"T", 0.0},	 {"G", 0.0}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.9167},	 {"C", 0.0833},	 {"T", 0.0},	 {"G", 0.0}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.0417},	 {"C", 0.9583},	 {"T", 0.0},	 {"G", 0.0}}));
+		profile_precomputed_viterbi_trained_distributions_pc.push_back(DiscreteDistribution({{"A", 0.0},	 {"C", 0.0417},	 {"T", 0.9583},	 {"G", 0.0}}));
+		std::vector<double> profile_precomputed_viterbi_trained_pi_begin_pc = {0.0357,0.0, 	0.0, 	0.0, 	0.4643, 0.0, 	0.0, 	 0.5, 	0.0, 	0.0};
+		std::vector<double> profile_precomputed_viterbi_trained_pi_end_pc = {0.0, 0.0, 0.0, 0.6667, 0.0, 0.0, 0.9231, 0.0, 0.0, 0.6667};
+		double profile_precomputed_viterbi_improvement_pc = utils::round_double(15.0271603832, 4);
+
+		/* Baum-Welch */
+		std::vector<std::vector<double>> profile_precomputed_bw_1_iter_1_seq_trained_transitions = 
+		{	{0.5944,0.0, 	0.0,	0.0, 	0.1406, 0.0, 	0.0, 	0.265, 	0.0, 	0.0},
+			{0.0, 	0.6543, 0.0,	0.0, 	0.0, 	0.0304, 0.0, 	0.0, 	0.3153, 0.0},
+		 	{0.0, 	0.0, 	0.5347, 0.0, 	0.0, 	0.0, 	0.3974,	0.0, 	0.0, 	0.068},
+		 	{0.0, 	0.0, 	0.0, 	0.5085, 0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0},
+		 	{0.0, 	0.0424, 0.0, 	0.0, 	0.0, 	0.9405, 0.0, 	0.0, 	0.0171, 0.0},
+		 	{0.0, 	0.0, 	0.3167, 0.0, 	0.0, 	0.0, 	0.6593,	0.0, 	0.0, 	0.0241},
+		 	{0.0, 	0.0, 	0.0, 	0.6486, 0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0},
+		 	{0.0, 	0.6356, 0.0, 	0.0, 	0.0, 	0.1462, 0.0, 	0.0, 	0.2182, 0.0},
+		 	{0.0, 	0.0, 	0.2298, 0.0, 	0.0, 	0.0, 	0.729, 	0.0, 	0.0, 	0.0413},
+		 	{0.0, 	0.0, 	0.0, 	0.4464, 0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0}};
+		std::vector<DiscreteDistribution> profile_precomputed_bw_1_iter_1_seq_trained_distributions;
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.4836}, {"C", 0.2707}, {"T", 0.2457}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.3954}, {"C", 0.3069}, {"T", 0.2977}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.4635}, {"C", 0.0208}, {"T", 0.5157}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.489 }, {"C", 0.0011}, {"T", 0.5099}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.9998}, {"C", 0.0   }, {"T", 0.0002}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0018}, {"C", 0.9981}, {"T", 0.0001}, {"G", 0.0}}));
+		profile_precomputed_bw_1_iter_1_seq_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0001}, {"C", 0.0001}, {"T", 0.9998}, {"G", 0.0}}));
+		std::vector<double> profile_precomputed_bw_1_iter_1_seq_trained_pi_begin = {0.0203,0.0, 	0.0, 	0.0, 	0.9516, 0.0, 	0.0, 	0.0281, 0.0, 	0.0};
+		std::vector<double> profile_precomputed_bw_1_iter_1_seq_trained_pi_end = {0.0,0.0,0.0,0.4915,0.0,0.0,0.3514,0.0,0.0,0.5536};
+
+		std::vector<std::vector<double>> profile_precomputed_bw_batch_trained_transitions = 
+		{	{0.0,	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	1.0, 	0.0, 	0.0}, 
+			{0.0,	0.0002, 0.0, 	0.0, 	0.0, 	0.0164, 0.0, 	0.0, 	0.9834, 0.0}, 
+			{0.0,	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0009,	0.0, 	0.0, 	0.9991}, 
+			{0.0,	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0}, 
+			{0.0,	0.0061, 0.0, 	0.0, 	0.0, 	0.9328, 0.0, 	0.0, 	0.0611, 0.0}, 
+			{0.0,	0.0, 	0.0325, 0.0, 	0.0, 	0.0, 	0.9673,	0.0, 	0.0, 	0.0002}, 
+			{0.0,	0.0, 	0.0, 	0.0434,	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0}, 
+			{0.0, 	0.0561, 0.0, 	0.0, 	0.0, 	0.9439, 0.0, 	0.0, 	0.0, 	0.0}, 
+			{0.0, 	0.0, 	0.6508, 0.0, 	0.0, 	0.0, 	0.3492,	0.0, 	0.0, 	0.0}, 
+			{0.0, 	0.0, 	0.0, 	0.9888,	0.0, 	0.0, 	0.0, 	0.0, 	0.0, 	0.0}};
+		std::vector<DiscreteDistribution> profile_precomputed_bw_batch_trained_distributions;
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.255 }, {"C", 0.745 }, {"T", 0.0   }, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.5102}, {"C", 0.4898}, {"T", 0.0   }, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0   }, {"C", 0.9955}, {"T", 0.0045}, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0   }, {"C", 1.0   }, {"T", 0.0   }, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.9313}, {"C", 0.0687}, {"T", 0.0   }, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0732}, {"C", 0.9268}, {"T", 0.0   }, {"G", 0.0}}));
+		profile_precomputed_bw_batch_trained_distributions.push_back(DiscreteDistribution({{"A", 0.0   }, {"C", 0.0113}, {"T", 0.9887}, {"G", 0.0}}));
+		std::vector<double> profile_precomputed_bw_batch_trained_pi_begin = {0.0186,0.0, 	0.0, 	0.0, 	0.4171, 0.0, 	0.0, 	0.5643, 0.0, 	0.0};
+		std::vector<double> profile_precomputed_bw_batch_trained_pi_end = {0.0,0.0,0.0,1.0,0.0,0.0,0.9566,0.0,0.0,0.0112};
+
 		double precomputed_profile_improvement_no_pseudocount = 84.9318;
 		double precomputed_profile_improvement_with_pseudocount = 78.9441;
-		std::vector<double> precomputed_observation_likelihood = 
-		{-0.505202786679,-0.505202786679,-4.85332533917,-5.86447364745,-0.505202786679,-0.505202786679,
-		-4.77279340553,-8.94719166767,-5.71623676018,-7.35302419896,-3.61187131339,-7.35302419896,
-		-7.35302419896,-7.35302419896,-7.35302419896,-7.35302419896,-7.35302419896,-0.505202786679,
-		-0.505202786679,-7.35302419896,-0.505202786679,-7.35302419896,-7.35302419896,-7.35302419896,
-		-7.35302419896};
-		for(double& likelihood : precomputed_observation_likelihood){ likelihood = utils::round_double(likelihood); }
-		std::vector<std::vector<std::string>>& profile_observation_likelihood_sequences = profile_training_sequences_1;
 
 		tests_init();
 		
@@ -626,15 +735,15 @@ int main(){
 		TEST_UNIT(
 			"observation likelihood (profile)",
 				HiddenMarkovModel hmm = profile_10_states_hmm;
-				std::size_t n_tests = 2;
+				std::size_t n_tests = 3;
 				/* Randomly choose n_tests sequences. Useless to test all 25 sequences. */
 				for(std::size_t i = 0; i < n_tests; ++i){
 					std::size_t random_sequence = (std::size_t)rand() % profile_observation_likelihood_sequences.size();	
 					const std::vector<std::string>& seq = profile_observation_likelihood_sequences[random_sequence];
-					double forward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq));
-					ASSERT(forward_observation_likelihood == precomputed_observation_likelihood[random_sequence]);
-					double backward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq,false));
-					ASSERT(backward_observation_likelihood == precomputed_observation_likelihood[random_sequence]);
+					double forward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq), 4);
+					ASSERT(forward_observation_likelihood == precomputed_profile_observation_likelihoods[random_sequence]);
+					double backward_observation_likelihood = utils::round_double(hmm.log_likelihood(seq,false), 4);
+					ASSERT(backward_observation_likelihood == precomputed_profile_observation_likelihoods[random_sequence]);
 				}
 		)
 
@@ -652,7 +761,6 @@ int main(){
 			auto viterbi_decode = hmm.decode(nucleobase_symbols);
 			std::vector<std::string> viterbi_path_3_states = viterbi_decode.first;
 			double viterbi_log_likelihood = utils::round_double(viterbi_decode.second, 4);
-			std::cout << viterbi_log_likelihood << std::endl;
 			ASSERT(viterbi_log_likelihood == nucleobase_precomputed_viterbi_log_likelihood);
 			ASSERT(viterbi_path_3_states == nucleobase_precomputed_viterbi_path_3_states);
 		)
@@ -660,36 +768,22 @@ int main(){
 		TEST_UNIT(
 			"viterbi decode (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
-			auto viterbi_seq1 = hmm.decode(profile_sequences[0]);
-			auto viterbi_seq2 = hmm.decode(profile_sequences[1]);
-			auto viterbi_seq3 = hmm.decode(profile_sequences[2]);
-			auto viterbi_seq4 = hmm.decode(profile_sequences[3]);
-			double seq1_viterbi_log_likelihood = utils::round_double(viterbi_seq1.second, 6);
-			double seq2_viterbi_log_likelihood = utils::round_double(viterbi_seq2.second, 6);
-			double seq3_viterbi_log_likelihood = utils::round_double(viterbi_seq3.second, 6);
-			double seq4_viterbi_log_likelihood = utils::round_double(viterbi_seq4.second, 6);
-			ASSERT(seq1_viterbi_log_likelihood == profile_seq1_viterbi_log_likelihood_precomputed);
-			ASSERT(seq2_viterbi_log_likelihood == profile_seq2_viterbi_log_likelihood_precomputed);
-			ASSERT(seq3_viterbi_log_likelihood == profile_seq3_viterbi_log_likelihood_precomputed);
-			ASSERT(seq4_viterbi_log_likelihood == profile_seq4_viterbi_log_likelihood_precomputed);
-			std::vector<std::string> seq1_viterbi_path = viterbi_seq1.first;
-			std::vector<std::string> seq2_viterbi_path = viterbi_seq2.first;
-			std::vector<std::string> seq3_viterbi_path = viterbi_seq3.first;
-			std::vector<std::string> seq4_viterbi_path = viterbi_seq4.first;
-			ASSERT(seq1_viterbi_path == profile_seq1_viterbi_path_precomputed);
-			ASSERT(seq2_viterbi_path == profile_seq2_viterbi_path_precomputed);
-			ASSERT(seq3_viterbi_path == profile_seq3_viterbi_path_precomputed);
-			ASSERT(seq4_viterbi_path == profile_seq4_viterbi_path_precomputed);
-			std::size_t n_tests = 2;
-			for(std::size_t i = 0; i < n_tests ; ++i){
-				std::size_t random_sequence = (std::size_t)rand() % profile_viterbi_decode_sequences.size();
-				double viterbi_log_likelihood = utils::round_double(hmm.decode(profile_viterbi_decode_sequences[random_sequence]).second);
-				ASSERT(viterbi_log_likelihood == precomputed_viterbi_log_likelihoods[random_sequence]);
+			std::size_t n_tests = 3;
+			std::vector<std::string> viterbi_path;
+			double viterbi_log_likelihood;
+			/* Randomly choose n_tests sequences. Useless to test all 25 sequences. */
+			for(std::size_t i = 0; i < n_tests; ++i){
+				std::size_t random_sequence = (std::size_t)rand() % profile_viterbi_decode_sequences.size();	
+				const std::vector<std::string>& seq = profile_viterbi_decode_sequences[random_sequence];
+				std::tie(viterbi_path, viterbi_log_likelihood) = hmm.viterbi_decode(seq);
+				viterbi_log_likelihood = utils::round_double(viterbi_log_likelihood, 4);
+				ASSERT(viterbi_path == precomputed_profile_viterbi_paths[random_sequence]);
+				ASSERT(viterbi_log_likelihood == precomputed_profile_viterbi_log_likelihoods[random_sequence]);
 			}
 		)
 
 		TEST_UNIT(
-			"viterbi training batch of sequences (casino)",
+			"viterbi training (batch of sequences) basic (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_2), 4);
 			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
@@ -700,7 +794,9 @@ int main(){
 			round_all(viterbi_trained_pi_begin, 4);
 			std::vector<DiscreteDistribution> viterbi_trained_distributions;
 			for(auto dist_p : hmm.raw_pdfs()){
-				viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				if(dist_p != nullptr){
+					viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
 			}
 			exp_all(viterbi_trained_distributions);
 			round_all(viterbi_trained_distributions, 4);
@@ -711,7 +807,7 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi training with pseudocounts (casino)",
+			"viterbi training (batch of sequences) with pseudocounts (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(casino_training_sequences_2, 1.0), 4);
 			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
@@ -722,7 +818,9 @@ int main(){
 			round_all(viterbi_trained_pi_begin, 4);
 			std::vector<DiscreteDistribution> viterbi_trained_distributions;
 			for(auto dist_p : hmm.raw_pdfs()){
-				viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				if(dist_p != nullptr){
+					viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
 			}
 			exp_all(viterbi_trained_distributions);
 			round_all(viterbi_trained_distributions, 4);
@@ -733,21 +831,55 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"viterbi training with silent states (profile)",
+			"viterbi training (batch of sequences) with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1), 4);
-			ASSERT(viterbi_improvement == precomputed_profile_improvement_no_pseudocount);
+			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
+			exp_all(viterbi_trained_transitions);
+			round_all(viterbi_trained_transitions, 4);
+			std::vector<double> viterbi_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(viterbi_trained_pi_begin);
+			round_all(viterbi_trained_pi_begin, 4);
+			std::vector<DiscreteDistribution> viterbi_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				if(dist_p != nullptr){
+					viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
+			}
+			exp_all(viterbi_trained_distributions);
+			round_all(viterbi_trained_distributions, 4);
+			ASSERT(viterbi_improvement == profile_precomputed_viterbi_improvement);
+			ASSERT(viterbi_trained_transitions == profile_precomputed_viterbi_trained_transitions);
+			ASSERT(viterbi_trained_pi_begin == profile_precomputed_viterbi_trained_pi_begin);
+			ASSERT(viterbi_trained_distributions == profile_precomputed_viterbi_trained_distributions);
 		)
 
 		TEST_UNIT(
-			"viterbi training with pseudocounts and with silent states (profile)",
+			"viterbi training (batch of sequences) with pseudocounts and with silent states (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			double viterbi_improvement = utils::round_double(hmm.train_viterbi(profile_training_sequences_1, 1.0), 4);
-			ASSERT(viterbi_improvement == precomputed_profile_improvement_with_pseudocount);
+			std::vector<std::vector<double>> viterbi_trained_transitions = hmm.raw_transitions();
+			exp_all(viterbi_trained_transitions);
+			round_all(viterbi_trained_transitions, 4);
+			std::vector<double> viterbi_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(viterbi_trained_pi_begin);
+			round_all(viterbi_trained_pi_begin, 4);
+			std::vector<DiscreteDistribution> viterbi_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				if(dist_p != nullptr){
+					viterbi_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
+			}
+			exp_all(viterbi_trained_distributions);
+			round_all(viterbi_trained_distributions, 4);
+			ASSERT(viterbi_improvement == profile_precomputed_viterbi_improvement_pc);
+			ASSERT(viterbi_trained_transitions == profile_precomputed_viterbi_trained_transitions_pc);
+			ASSERT(viterbi_trained_pi_begin == profile_precomputed_viterbi_trained_pi_begin_pc);
+			ASSERT(viterbi_trained_distributions == profile_precomputed_viterbi_trained_distributions_pc);
 		)
 
 		TEST_UNIT(
-			"baum-welch training batch of sequences (casino)",
+			"baum-welch training (batch of sequences) basic (casino)",
 			HiddenMarkovModel hmm = casino_hmm;
 			double bw_improvement = utils::round_double(hmm.train_baum_welch(casino_training_sequences_2), 4);
 			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
@@ -758,7 +890,9 @@ int main(){
 			round_all(bw_trained_pi_begin, 4);
 			std::vector<DiscreteDistribution> bw_trained_distributions;
 			for(auto dist_p : hmm.raw_pdfs()){
-				bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				if(dist_p != nullptr){
+					bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
 			}
 			exp_all(bw_trained_distributions);
 			round_all(bw_trained_distributions, 4);
@@ -769,7 +903,7 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"baum-welch training with end state (nucleobase)",
+			"baum-welch training (1 sequence) with end state (nucleobase)",
 			HiddenMarkovModel hmm = nucleobase_3_states_hmm;
 			double bw_improvement = utils::round_double(hmm.train_baum_welch(nucleobase_training_sequences), 4);
 			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
@@ -783,7 +917,9 @@ int main(){
 			round_all(bw_trained_pi_end, 4);
 			std::vector<DiscreteDistribution> bw_trained_distributions;
 			for(auto dist_p : hmm.raw_pdfs()){
-				bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				if(dist_p != nullptr){
+					bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
 			}
 			exp_all(bw_trained_distributions);
 			round_all(bw_trained_distributions, 4);
@@ -795,20 +931,67 @@ int main(){
 		)
 
 		TEST_UNIT(
-			"baum-welch training with silent states (profile)",
+			"baum-welch training (1 sequence and 1 iteration) with silent states and silent begin/end paths (profile)",
 			HiddenMarkovModel hmm = profile_10_states_hmm;
 			hmm.train_baum_welch(profile_training_sequences_2, 0.0, 1);
-			hmm.print_transitions(true);
-			hmm.print_pi_begin(true);
-			hmm.print_pi_end(true);
-			hmm.print_distributions(false);
+			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
+			exp_all(bw_trained_transitions);
+			round_all(bw_trained_transitions, 4);
+			std::vector<double> bw_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(bw_trained_pi_begin);
+			round_all(bw_trained_pi_begin, 4);
+			std::vector<double> bw_trained_pi_end = hmm.raw_pi_end();
+			exp_all(bw_trained_pi_end);
+			round_all(bw_trained_pi_end, 4);
+			std::vector<DiscreteDistribution> bw_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				if(dist_p != nullptr){
+					bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
+			}
+			exp_all(bw_trained_distributions);
+			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_trained_transitions == profile_precomputed_bw_1_iter_1_seq_trained_transitions);
+			ASSERT(bw_trained_pi_begin == profile_precomputed_bw_1_iter_1_seq_trained_pi_begin);
+			ASSERT(bw_trained_pi_end == profile_precomputed_bw_1_iter_1_seq_trained_pi_end);
+			ASSERT(bw_trained_distributions == profile_precomputed_bw_1_iter_1_seq_trained_distributions);
 		)
 
+		TEST_UNIT(
+			"baum-welch training (batch of sequences and 10 iterations) with silent states and silent begin/end paths (profile)",
+			HiddenMarkovModel hmm = profile_10_states_hmm;
+			hmm.train_baum_welch(profile_training_sequences_1, 0.0, 10);
+			std::vector<std::vector<double>> bw_trained_transitions = hmm.raw_transitions();
+			exp_all(bw_trained_transitions);
+			round_all(bw_trained_transitions, 4);
+			std::vector<double> bw_trained_pi_begin = hmm.raw_pi_begin();
+			exp_all(bw_trained_pi_begin);
+			round_all(bw_trained_pi_begin, 4);
+			std::vector<double> bw_trained_pi_end = hmm.raw_pi_end();
+			exp_all(bw_trained_pi_end);
+			round_all(bw_trained_pi_end, 4);
+			std::vector<DiscreteDistribution> bw_trained_distributions;
+			for(auto dist_p : hmm.raw_pdfs()){
+				if(dist_p != nullptr){
+					bw_trained_distributions.push_back(*((DiscreteDistribution*)dist_p));
+				}
+			}
+			exp_all(bw_trained_distributions);
+			round_all(bw_trained_distributions, 4);
+			ASSERT(bw_trained_transitions == profile_precomputed_bw_batch_trained_transitions);
+			ASSERT(bw_trained_pi_begin == profile_precomputed_bw_batch_trained_pi_begin);
+			ASSERT(bw_trained_pi_end == profile_precomputed_bw_batch_trained_pi_end);
+			ASSERT(bw_trained_distributions == profile_precomputed_bw_batch_trained_distributions);
+		)
 
 
 		/* Test fix / free parameters */
 
 		/* Test update from raw model */
+
+		/* Test save/load */
+
+		/* Test factory */
 
 		/* Train stochastic EM */
 
