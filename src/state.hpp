@@ -117,6 +117,13 @@ public:
 		}
 	}
 
+	void set_distribution(const Distribution& dist){
+		if(_distribution != nullptr){
+			delete _distribution;
+		}
+		_distribution = dist.clone();
+	}
+
 	std::string name() const { return _name; }
 	void set_name(const std::string& name) { _name = name; }   
 
@@ -125,7 +132,7 @@ public:
 	}
 
 	virtual ~State(){
-		delete _distribution;
+		if(_distribution != nullptr) { delete _distribution; }
 	}
 
 };

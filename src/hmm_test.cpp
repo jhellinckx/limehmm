@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdlib>
+#include <cstdio> // std::remove file
 #include <cmath>
 #include <limits>
 #include <iostream>
@@ -13,6 +14,7 @@
 #include <tuple> // std::tie
 #include "utils.hpp"
 #include "hmm.hpp" // tested hmm library
+#include "hmm_algorithms.hpp"
 
 #define ASSERT(expr) assert(expr, #expr, __FILE__, __LINE__)
 #define ASSERT_VERBOSE(expr, msg) assert(expr, #expr, __FILE__, __LINE__, msg)
@@ -104,7 +106,7 @@ int main(){
 		/* Create hmm examples. */
 
 		/* Simple fair/biased model. */
-		HiddenMarkovModel casino_hmm("casino");
+		HiddenMarkovModel casino_hmm("casino", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 		DiscreteDistribution fair_dist({{"H", 0.5}, {"T", 0.5}});
 		DiscreteDistribution biased_dist({{"H", 0.75}, {"T", 0.25}});
 		State fair = State("fair", fair_dist);
@@ -169,7 +171,7 @@ int main(){
 		double casino_precomputed_bw_improvement = utils::round_double(5.05069902785, 4);
 
 		/* Simple hmm with 3 states emitting nucleobases. */
-		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states");
+		HiddenMarkovModel nucleobase_3_states_hmm("nucleobase 3 states", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 		DiscreteDistribution dist1({{"A", 0.35}, {"C", 0.20}, {"G", 0.05}, {"T", 0.40}});
 		DiscreteDistribution dist2({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
 		DiscreteDistribution dist3({{"A", 0.10}, {"C", 0.40}, {"G", 0.40}, {"T", 0.10}});
@@ -208,7 +210,7 @@ int main(){
 		double nucleobase_precomputed_bw_improvement = utils::round_double(3.23843686377, 4);
 
 		/* Profile hmm with 10 states. */
-		HiddenMarkovModel profile_10_states_hmm("profile 10 states");
+		HiddenMarkovModel profile_10_states_hmm("profile 10 states", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 		DiscreteDistribution i_d({{"A", 0.25}, {"C", 0.25}, {"G", 0.25}, {"T", 0.25}});
 		/* Create insert states. */
 		State i0 = State("I0", i_d);
@@ -511,28 +513,10 @@ int main(){
 			/* Thus, distributions will now differ. */
 			ASSERT((dist2 != dist3));
 		)
-		
-		TEST_UNIT(
-			"begin/end state",
-			State begin("begin");
-			State end("end");
-			/* Construct hmm by specifying begin and end state. */
-			HiddenMarkovModel hmm = HiddenMarkovModel(begin, end);
-			ASSERT(hmm.begin() == begin);
-			ASSERT(hmm.end() == end);
-			/* Check if the begin/end states were added to the hmm. */
-			ASSERT(hmm.has_state(begin));
-			ASSERT(hmm.has_state(end));
-			/* Currently removing the begin state is allowed. */ //TODO
-			hmm.remove_state(begin);
-			ASSERT(!hmm.has_state(begin));
-			/* Accessing begin when it has been removed throws an exception. */
-			ASSERT_EXCEPT(hmm.begin(), StateNotFoundException);
-		)
 
 		TEST_UNIT(
 			"add/remove state",
-			HiddenMarkovModel hmm = HiddenMarkovModel();
+			HiddenMarkovModel hmm = HiddenMarkovModel("add_remove", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 			State s("s");
 			/* Not yet added */
 			ASSERT(!hmm.has_state("s"));
@@ -552,7 +536,7 @@ int main(){
 
 		TEST_UNIT(
 			"add/remove transition",
-			HiddenMarkovModel hmm = HiddenMarkovModel();
+			HiddenMarkovModel hmm = HiddenMarkovModel("add_remove", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 			State s1("s1");
 			State s2("s2");
 			hmm.add_state(s1);
@@ -572,6 +556,9 @@ int main(){
 			/* Re-add it. */
 			hmm.add_transition(s1, s2, 0.3);
 			ASSERT(hmm.has_transition(s1, s2));
+			/* Set it. */
+			hmm.set_transition(s1, s2, 0.1);
+			ASSERT(hmm.get_transition(s1, s2) == 0.1);
 			/* Add transition where from == to. */
 			hmm.add_transition(s1, s1, 0.9);
 			ASSERT(hmm.has_transition(s1, s1));
@@ -586,7 +573,7 @@ int main(){
 		TEST_UNIT(
 			"initial probability aka pi",
 			State s1("s1");
-			HiddenMarkovModel hmm;
+			HiddenMarkovModel hmm("pi", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 			hmm.add_state(s1);
 			/* Set initial probability by adding a transition to the being state of the hmm. */
 			hmm.add_transition(hmm.begin(), s1, 0.4);
@@ -600,8 +587,55 @@ int main(){
 		)
 
 		TEST_UNIT(
+			"save/load hmm",
+			std::string tmp_filename = "test_hmm_file_tmp";
+			std::string extension = "hmm";
+			std::string hmm_name = "save_test";
+			DiscreteDistribution save_s1_dist({{"a", 0.8}, {"b", 0.2}});
+			DiscreteDistribution save_s2_dist({{"c", 0.2}, {"a", 0.5}});
+			HiddenMarkovModel hmm(hmm_name, LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
+			State save_s1("save_s1", save_s1_dist);
+			State save_s2("save_s2", save_s2_dist);
+			State save_s3("save_s3");
+			hmm.add_state(save_s1);
+			hmm.add_state(save_s2);
+			hmm.add_state(save_s3);
+			double save_s1_save_s1_trans = 0.1;
+			double save_s1_save_s2_trans = 0.2;
+			double save_s2_save_s2_trans = 0.3;
+			double save_s2_save_s3_trans = 0.9;
+			double save_s1_begin = 0.5;
+			double save_s2_end = 0.89;
+			hmm.add_transition(save_s1, save_s1, save_s1_save_s1_trans);
+			hmm.add_transition(save_s1, save_s2, save_s1_save_s2_trans);
+			hmm.add_transition(save_s2, save_s2, save_s2_save_s2_trans);
+			hmm.add_transition(save_s2, save_s3, save_s2_save_s3_trans);
+			hmm.begin_transition(save_s1, save_s1_begin);
+			hmm.end_transition(save_s2, save_s2_end);
+			hmm.save(tmp_filename, extension);
+			
+			HiddenMarkovModel loaded_hmm("load", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
+			loaded_hmm.load(tmp_filename, extension);
+			std::remove(std::string(tmp_filename + "." + extension).c_str());
+
+			ASSERT(hmm.begin() == loaded_hmm.begin());
+			ASSERT(hmm.end() == loaded_hmm.end());
+			ASSERT(loaded_hmm.has_state(save_s1));
+			ASSERT(loaded_hmm.has_state(save_s2));
+			ASSERT(loaded_hmm.get_state(save_s1).distribution() == save_s1_dist);
+			ASSERT(loaded_hmm.get_state(save_s2).distribution() == save_s2_dist);
+			ASSERT_EXCEPT(loaded_hmm.get_state(save_s3).distribution(), StateDistributionException);
+			ASSERT(loaded_hmm.get_transition(save_s1, save_s2) == save_s1_save_s2_trans);
+			ASSERT(loaded_hmm.get_transition(save_s1, save_s1) == save_s1_save_s1_trans);
+			ASSERT(loaded_hmm.get_transition(save_s2, save_s3) == save_s2_save_s3_trans);
+			ASSERT(loaded_hmm.get_transition(loaded_hmm.begin(), save_s1) == save_s1_begin);
+			ASSERT(loaded_hmm.get_transition(save_s2, loaded_hmm.end()) == save_s2_end);
+			ASSERT_EXCEPT(loaded_hmm.get_transition(save_s2, save_s1), TransitionNotFoundException);
+		)
+
+		TEST_UNIT(
 			"brew",
-			HiddenMarkovModel hmm;
+			HiddenMarkovModel hmm("brew", LinearMemoryForwardAlgorithm(), LinearMemoryBackwardAlgorithm(), LinearMemoryViterbiDecodingAlgorithm(), LinearMemoryViterbiTraining());
 			DiscreteDistribution dist1 = DiscreteDistribution({{"A",0.3}, {"T", 0.2}, {"G", 0.5}});
 			hmm.add_state(State("s1", dist1));
 			dist1["C"] = 0.2;
@@ -772,7 +806,7 @@ int main(){
 			for(std::size_t i = 0; i < n_tests; ++i){
 				std::size_t random_sequence = (std::size_t)rand() % profile_viterbi_decode_sequences.size();	
 				const std::vector<std::string>& seq = profile_viterbi_decode_sequences[random_sequence];
-				std::tie(viterbi_path, viterbi_log_likelihood) = hmm.viterbi_decode(seq);
+				std::tie(viterbi_path, viterbi_log_likelihood) = hmm.decode(seq);
 				viterbi_log_likelihood = utils::round_double(viterbi_log_likelihood, 4);
 				ASSERT(viterbi_path == precomputed_profile_viterbi_paths[random_sequence]);
 				ASSERT(viterbi_log_likelihood == precomputed_profile_viterbi_log_likelihoods[random_sequence]);
@@ -981,17 +1015,13 @@ int main(){
 			ASSERT(bw_trained_distributions == profile_precomputed_bw_batch_trained_distributions);
 		)
 
-		/* Train stochastic EM */
+		/* Test factory */
 
 		/* Test fix / free parameters */
 
 		/* Test update from raw model */
 
-		/* Test save/load */
-
-		/* Test factory */
-
-		
+		/* Train stochastic EM */
 
 		/* Profile HMM */
 

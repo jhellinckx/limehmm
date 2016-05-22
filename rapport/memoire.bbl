@@ -1,0 +1,32 @@
+\begin{thebibliography}{}
+
+\bibitem[Churbanov and Winters-Hilt, 2008]{Ch}
+Churbanov, A. and Winters-Hilt, S. (2008).
+\newblock Implementing em and viterbi algorithms for hidden markov model in
+  linear memory.
+\newblock {\em BMC Bioinformatics}, 9:224.
+
+\bibitem[Durbin et~al., 1998]{Durbin}
+Durbin, R., Eddy, S., Krogh, A., and Mitchison, G. (1998).
+\newblock {\em Biological sequence analysis}.
+\newblock Cambridge University Press.
+
+\bibitem[Lam and Meyer, 2010]{LM}
+Lam, T.~Y. and Meyer, I. (2010).
+\newblock Efficient algorithms for training the parameters of hidden markov
+  models using stochastic expectation maximization (em) training and viterbi
+  training.
+\newblock {\em Algorithms for Molecular Biology}, 5:38.
+
+\bibitem[Miklós and Meyer, 2005]{MM}
+Miklós, I. and Meyer, I. (2005).
+\newblock A linear algorithm for baum-welch training.
+\newblock {\em BMC Bioinformatics}, 6:231.
+
+\bibitem[Yoon, 2009]{Intro}
+Yoon, B.-J. (2009).
+\newblock Hidden markov models and their applications in biological sequence
+  analysis.
+\newblock {\em Current Genomics}, 10:402--415.
+
+\end{thebibliography}

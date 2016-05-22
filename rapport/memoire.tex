@@ -1,0 +1,246 @@
+\documentclass[letterpaper]{article}
+\usepackage[]{natbib}
+\usepackage{alifexi}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[francais]{babel}
+\usepackage{amssymb,amsmath}
+
+
+\title{Développement d'une librairie pour les Modèles de Markov Cachés en mémoire linéaire}
+\author{Jérôme Hellinckx \\
+\mbox{}\\
+Université Libre de Bruxelles}
+
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+\DeclareMathOperator*{\argmax}{\arg\!\max}
+
+\begin{document}
+\renewcommand{\labelitemi}{$\bullet$}
+
+\maketitle
+
+% ABSTRACT
+\begin{abstract}
+Les Modèles de Markov Cachés (HMMs) sont des modèles probabilistes utilisés dans des domaines variés allant de l'analyse de séquences biologiques à la reconnaissance vocale. Un des problèmes récurrent concernant de tels modèles est leur grande consommation de la mémoire, dépendante de la taille de la séquence considérée. Des algorithmes en mémoire linéaire furent introduits ces dernières années. 
+Dans cet article, nous définissions brièvement les HMMs et leurs algorithmes ainsi que leurs équivalents en mémoire linéaire décrits par \cite{Ch, LM, MM}. Nous proposons ensuite une librairie \texttt{C++} permettant de construire et d'employer de tels modèles respectant la contrainte sur la mémoire et nous démontrons ses fonctionnalités.
+\end{abstract}
+
+% INTRODUCTION
+\section{Introduction}
+
+% 1) décrire fonctionnalités de la librairie
+% 2) objectif 
+ 
+ % DEFINITION
+\section{Modèles de Markov Cachés}
+\subsection{Définition}
+Un Modèle de Markov Caché, dénoté HMM dans cet article, est un modèle probabiliste qui peut être utilisé pour décrire l'évolution d'événements observables qui sont issus de facteurs internes non-observables. Les événements observables sont appelés \textit{symboles} et les facteurs invisibles \textit{états} \citep{Intro}. Un HMM peut alors être décrit comme une machine à état fini stochastique pour laquelle chaque transition entre états cachés se termine par une émission de symbole, où la transition ainsi que l'émission dépendent de distributions de probabilités \citep{Ch}. Nous introduisons maintenant les notations utilisées dans cet article pour les paramètres décrivant l'implémentation conventionnelle d'un HMM \citep{Ch} : 
+\begin{itemize}
+	\item Un ensemble d'états $S=\{S_1\dots S_N\}$ avec $q_t$ l'état visité à l'instant $t$;
+	\item Un ensemble de symboles $\mathcal{O} = \{o_1\dots o_M\}$, appelé alphabet, avec $o_t$ le symbole émit à l'instant $t$ ;
+	\item Un ensemble de fonctions de densité de probabilité $B = \{b_1(o) \dots b_N(o)\}$, décrivant les probabilités d'émission $b_j(o_t)$ qui est la probabilité que l'état visité à l'instant $t$, $q_t = S_j$ émette le symbole $o$ pour $1\leq j\leq N$, $o_t \in \mathcal{O} $ ; 
+	\item Une matrice de probabilités de transition entre états $A = \{a_{i, j}\}$ pour $1\leq i, j \leq N$, où $a_{i, j}=P(q_{t+1} = S_j \mid q_t = S_i)$;
+	\item Un vecteur de distributions initiales d'états $\Pi = \{\pi_1,\dots ,\pi_N\}$.
+\end{itemize}
+L'ensemble de ces paramètres, dénoté $\Theta$, définit entièrement un HMM. Notons aussi $O=\{o_1 \dots o_T\}$, une séquence de symboles avec $o_t \in \mathcal{O}$ pour $1 \leq t \leq T$. 
+
+\subsection{Les trois problèmes basiques d'un HMM}
+Afin de rendre plus aisées les explications sur les méthodes employées par la librairie pour proposer des HMMs en mémoire linéaire, nous expliquons ci-dessous les trois problèmes basiques des HMMs. Nous partirons alors des notions et formules introduites pour éclairer notre implémentation en mémoire linéaire. Cette section fait donc principalement office de rappel et n'a que très peu d'utilité pour un lecteur bio-informaticien aguerri.
+
+% EVALUATION
+\subsubsection{Problème d'évaluation} Soit un HMM paramétrisé par $\Theta$, quelle est la probabilité d'observer la séquence $O$, $P(O \mid \Theta)$ ? Il existe deux algorithmes de programmation dynamique permettant de calculer efficacement cette probabilité. D'une part le \textit{forward algorithm} qui définit une \textit{forward variable} $\alpha_t(i) = P(o_1\dots o_t \mid q_t = S_i, \Theta)$ déterminant donc la probabilité d'observer $o_1\dots o_t$ et d'arriver à $q_t =  S_i$. Cette variable est obtenue par la formule récursive 
+\begin{equation} \label{eq:forward} % FORWARD
+\alpha_t(i) = \begin{cases}
+		\pi_i b_i(o_1), & t=1 \\ 
+		\Big[ \sum_{j=1}^{N}\alpha_{t-1}(j)a_{j,i} \Big] b_i(o_t), & t=2\dots T
+\end{cases}
+\end{equation}
+
+D'autre part le \textit{backward algorithm}, algorithme analogue mais fonctionnant dans le sens inverse, définit une \textit{backward variable} $\beta_t(i) = P(o_{t+1}\dots o_T \mid q_t = S_i, \Theta)$ qui détermine donc la probabilité d'observer $o_t\dots o_T$ après être arrivé à $q_t =  S_i$. Elle se calcule aussi de manière récursive
+\begin{equation} \label{eq:backward} % BACKWARD
+\beta_t(i) = \begin{cases}
+		1, & t=T \\ 
+		\sum_{j=1}^{N} a_{i,j} b_j(o_{t+1}) \beta_{t+1}(j) , & t=T-1\dots 1
+\end{cases}
+\end{equation}
+Nous trouvons alors la probabilité d'observation de la séquence $O$, $P(O \mid \Theta)$, en additionnant les $\alpha_T(i), \forall i \in S$ pour le \textit{forward algorithm}. Pour le \textit{backward algorithm}, il faut encore considérer la probabilité initiale $\pi(i)$ et la probabilité d'émission de $o_1$, il faut donc effectuer la somme de $\pi(i) b_i(o_1) \beta_1(i), \forall i \in S$.
+
+% DECODAGE VITERBI
+\subsubsection{Problème de décodage}
+Soit une séquence de symboles $O$ et un HMM paramétrisé par $\Theta$, quel est le chemin d'états permettant de maximiser la probabilité d'observation de $O$, $Q^* = \max\limits_{Q} P(Q \mid O, \Theta) $ ? Intuitivement, nous cherchons donc la séquence d'états optimale, celle qui expliquerait \textit{au mieux} les symboles observés. Introduisons le \textit{Viterbi algorithm}, permettant de trouver un tel chemin (souvent dénoté chemin Viterbi). Cet algorithme définit deux variables, $\phi_t(i)$ qui est le score maximum le long d'un chemin d'états $q_1 \dots q_{t-1}$ arrivant à l'état $i$ en $q_t$ et émettant les symboles $o_1\dots o_t$, et $\psi(i)$, qui est l'état $j$ en $t-1$ pour lequel $\phi_{t-1}(j)a_{j,i}$ est maximal, soit formellement
+
+\begin{equation} \label{eq:viterbi}
+\begin{aligned}
+	& \phi_t(i) = 
+		\begin{cases} 
+		\pi_i b_i(o_1), & t=1 \\
+		\max\limits_{1\leq j \leq N} \Big[ \phi_{t-1}(j)a_{j,i} \Big] b_i(o_t) & t=2\dots T
+		\end{cases} 
+	\\
+	& \psi_t(i) = 
+		\begin{cases}
+		0, & t=1 \\
+		\argmax\limits_{1 \leq j \leq N} \Big[ \phi_{t-1}(j)a_{j,i} \Big]	& t=2\dots T
+		\end{cases}
+\end{aligned}
+\end{equation}
+La terminaison trouve alors $q_T^*$, le dernier état du chemin optimal, en prenant le maximum des $\phi_T(i)$. Pour trouver les autres états $q_1^*\dots q_{T-1}^*$ afin d'obtenir $Q^*$, il suffit d'effectuer un retour en arrière sur $\psi$, où $q_t^* = \psi_{t+1}(q_{t+1}^*)$.
+
+% PROBLEME ENTRAINEMENT 
+\subsubsection{Problème d'entrainement}
+Soit un ensemble de séquences de symboles observés $ X = \{O_1\dots O_K\}$, comment choisir la paramétrisation $\Theta = (S, B, A, \pi)$ d'un HMM représentant $X$ ? Il existe actuellement une large littérature pour estimer les paramètres de Modèles de Markov Cachés et il serait inutile d'en faire la liste exhaustive. Nous nous limitons donc aux algorithmes pour lesquels une approche en mémoire linéaire a déjà été décrite, étant donné qu'une telle approche est celle adoptée par la librairie proposée dans cet article. \\
+
+Tous les algorithmes d'entrainement que nous développons ici sont des algorithmes itératifs, en ce qu'ils réestiment l'ensemble de paramètres $\Theta$ du HMM à chaque itération $n$ en utilisant le $\Theta$ obtenu pendant l'itération $n-1$ où la réestimation pour chaque itération $n$ dépend de l'algorithme d'entrainement spécifique utilisé et de l'ensemble de séquences d'entrainement $X$. Notons que le nombre d'itérations dépend d'une valeur $\epsilon$ (donnée au préalable) qui indique l'\textit{amélioration} minimale de la probabilité d'observation de $X$ à chaque réestimation de $\Theta$, les itérations cessent donc dès que l'amélioration est $\leq \epsilon$ (ou qu'un nombre maximum d'itérations est atteint).
+
+% ENTRAINEMENT VITERBI
+\paragraph{Entraînement Viterbi}
+Le premier algorithme d'entrainement que nous introduisons est l'entrainement Viterbi, qui, à chaque itération $n$, calcule le chemin d'états optimal (voir ci-dessus) pour chaque $O \in X$. L'algorithme compte alors les émissions $b_i(o_t)$ et les transitions $a_{i,j}$ dans ces chemins optimaux et en dérive la réestimation de $\Theta$ en normalisant les comptes \citep{LM}. Soit $A_{i,j}^{n}$ le nombre de transitions de $i$ à $j$ et $B_i^n(o)$ le nombre d'émissions de $o$ par $i$ dans les chemins optimaux $Q_1^*\dots Q_K^*$ pour l'itération $n$ :
+\begin{equation} \label{eq:viterbi_training}
+\begin{aligned}
+	& a_{i,j}^{n+1} = \frac{A_{i,j}^n}{\sum_{k=1}^{N} A_{i,k}^n} \\
+	& b_i^{n+1}(o) = \frac{B_i^n(o)}{\sum_{o' \in \mathcal{O}} B_i^n(o')} 
+\end{aligned}
+\end{equation}
+Le même raisonnement est applicable au paramètre $\pi$. Remarquons que l'implémentation \textit{normale} de l'entrainement Viterbi requiert de garder en mémoire le retour en arrière $\psi$ afin d'effectuer les comptes pour chaque séquence d'entrainement $O \in X$.
+
+% ENTRAINEMENT BAUM WELCH 
+\paragraph{Entraînement Baum-Welch} Alors que l'entrainement Viterbi ne considère qu'un seul chemin d'états pour une séquence d'entrainement $O \in X$ donnée, l'entrainement Baum-Welch se sert de tous les chemins possibles pour calculer la nouvelle valeur des paramètres. L'algorithme de Baum-Welch typique se sert ainsi des algorithmes \textit{forward} et \textit{backward} afin de tenir compte de tous les chemins. Soit $A_{i,j}^n(O)$, définie par \cite{MM} comme la somme pondérée des probabilités des chemins d'états de la séquence $O$ contenant au moins une transition de $i$ à $j$ sachant que la pondération de chacun de ces chemins est le nombre de fois que cette transition se produit le long de ce chemin et $B_i^n(o, O)$ la somme analogue pour les émissions, soit 
+\begin{equation} \label{eq:bw_1}
+\begin{aligned}
+	& A_{i,j}^n(O) = \sum\limits_{t=1}^T \alpha_t^n(i) a_{i,j}^n b_j^n(o_{t+1}) \beta_{t+1}^n(j) \\
+	& B_{i}^n(o, O) = \sum\limits_{t=1}^T \delta_{o_t,o} \alpha_t^n(i) b_i^n(o_t) 
+\end{aligned}
+\end{equation}
+où $\delta_{o_t, o} = 1$ si $o=o_t$, $0$ sinon. Les nouvelles valeurs de $\Theta$ sont alors obtenues formellement par 
+\begin{equation} \label{eq:bw_2}
+\begin{aligned}
+	& a_{i,j}^{n+1} = \frac{\sum_{O \in X} A_{i,j}^n(O) / P(O)}{\sum_{k=1}^N \sum_{O \in X} A_{i,k}^n(O) / P(O)} \\ \\
+	& b_i^{n+1}(o) = \frac{\sum_{O \in X} B_{i}^n(o, O) / P(O)}{\sum_{o' \in \mathcal{O}} \sum_{O \in X} B_{i}^n(o', O) / P(O)}
+\end{aligned}
+\end{equation}
+avec $P(O)$ la probabilité d'observation de la séquence O en $n$. Ajoutons qu'une implémentation typique de cet algorithme requiert de garder en mémoire les matrices \textit{forward} et \textit{backward} de chaque séquence $O \in X$ pour calculer les $A_{i,j}^n(O)$ et $B_{i}^n(o, O)$.
+
+% \paragraph{Entrainement EM stochastique}
+
+\section{Méthodes utilisées pour implémenter les HMMs en mémoire linéaire}
+Le problème qui se pose est donc de fournir une librairie permettant de construire des HMMs en fournissant les résolutions typiques aux problèmes basiques cités ci-dessus, tout en respectant la contrainte de la mémoire linéaire. Nous séparons les explications pour chaque problème en commençant à chaque fois par une approche théorique avant de développer brièvement un paragraphe sur l'implémentation en \texttt{C++} proposée par la librairie présentée. \\
+
+Avant de parcourir chaque problème, il s'avère pertinent de d'abord énoncer la stratégie générale adoptée par la librairie. L'approche adoptée est de respecter le design pattern \textit{Strategy} pour les algorithmes des HMMs. Dès lors les objets HMMs proposés ne définissent pas eux-mêmes ces algorithmes, mais utilisent plutôt un de leurs attributs qui pointe vers l'algorithme qui a été donné à sa construction. Ce découplage permet donc de fournir lors de la construction n'importe quel algorithme pour n'importe quel problème. Ainsi, pour entrainer un objet HMM avec l'algorithme Baum-Welch linéaire, nous lui donnons la classe qui implémente cet algorithme lors de la construction et l'appel à la méthode d'entrainement du HMM délèguera l'entrainement à ladite classe. Remarquons qu'il est en conséquence très facile d'ajouter des algorithmes d'entrainement différent puisqu'il suffit d'ajouter une classe implémentant le nouvel algorithme désiré et de donner une instance de cette classe à l'objet HMM visé.  Notons aussi que tous ces algorithmes se situent dans le fichier \texttt{hmm\_algorithms.cpp}. 
+
+% FORWARD ET BACKWARD LINEAIRES
+\subsection{Algorithmes \textit{forward} et \textit{backward}}
+\paragraph{Théorie}
+Au lieu de stocker les variables \textit{forward} et \textit{backward} dans des matrices $M \times T$, nous implémentons les algorithmes \textit{forward} et \textit{backward} en ne gardant simultanément en mémoire que deux vecteurs de taille $M$. Ceci découle de l'observation suivante : à chaque récursion $t$, il nous faut uniquement connaitre les valeurs de $\alpha_{t-1}$ pour l'équation \ref{eq:forward} et $\beta_{t-1}$ pour l'équation \ref{eq:backward} \citep{MM}. Cette considération permet donc que la mémoire ne dépende pas de la taille $T$ de la séquence $O$ analysée et ne s'accompagne pas d'une perte de performance pour le problème d'évaluation et le problème de décodage.
+
+\paragraph{Implémentation}
+
+% DECODAGE VITERBI LINEAIRE
+\subsection{Décodage Viterbi}
+\paragraph{Théorie}
+L'observation permettant de respecter la contrainte mémoire pour les algorithmes \textit{forward} et \textit{backward} est également valable pour la variable $\phi$ de l'algorithme de Viterbi \citep{Ch}. En effet, l'équation \ref{eq:viterbi} montre que le calcul de $\phi_t$ requiert de connaitre uniquement $\phi_{t-1}$.  \\
+
+De plus, \cite{Ch} décrit une méthode permettant de ne pas avoir recourt à une matrice $M \times T$ pour les valeurs de retour en arrière $\psi$. En effet, l'article avance que l'utilisation d'une liste chaînée permet de réduire l'espace mémoire alloué pour $\psi$ en faisant l'observation que les chemins de retour en arrière convergent vers le chemin d'états optimal, et reviennent donc ensemble, en arrière, aux valeurs $\psi_1$. Dès lors, l'utilisation d'une liste chainée permet de se \textit{débarrasser} des chemins d'états non-optimaux.
+
+\paragraph{Implémentation}
+
+% ENTRAINEMENT VITERBI LINEAIRE
+\subsection{Entraînement Viterbi}
+\paragraph{Théorie}
+Étant donné que l'entrainement Viterbi utilise la procédure de décodage de Viterbi décrite dans l'équation \ref{eq:viterbi}, nous pouvons à nouveau appliquer l'observation faites précédemment : le calcul des valeurs de $\phi$ peut être poursuivit en ne retenant que les valeurs obtenues lors de la récursion précédente.  \\
+
+Établissons encore une autre observation faites par \cite{LM} : pour obtenir les valeurs $A_{i,j}^n$ et $B_i^n(o)$ il est uniquement nécessaire de connaitre le \textit{nombre de fois} que chaque transition et émission a été utilisée dans le chemin optimal pour chaque séquence d'entrainement $O \in X$ mais pas \textit{où} dans la matrice Viterbi chaque transition et émission a été utilisée. \\
+
+En s'aidant des deux observations précédentes, \cite{LM} décrit un algorithme d'entrainement Viterbi qui calcule les comptes $A_{i,j}^n$ et $B_i^n(o)$ en linéarisant l'utilisation de la mémoire par rapport aux longueurs des séquences d'entrainement. Pour ce, deux nouvelles notations sont introduites par l'article : 
+\begin{itemize}
+	\item $A_{i,j}(t, m)$ : le nombre de fois que la transition de $i$ à $j$ est utilisée dans le chemin d'états optimal finissant dans l'état $m$ à la position $t$ de la séquence; 
+	\item $B_i(o, t, m)$ : le nombre de fois que l'état $i$ émet le symbole $o$ dans le chemin d'états optimal finissant dans l'état $m$ à la position $t$ de la séquence. \\
+\end{itemize} 
+
+L'algorithme d'entrainement Viterbi effectue donc une récursion similaire au décodage Viterbi, en ce qu'il calcule $\phi_t$ à chaque $t$. \cite{LM} montre ensuite le calcul des  $A_{i,j}(t, m)$ et $B_i(o, t, m)$ pour la récursion $t$
+\begin{equation}
+\begin{aligned}
+	& A_{i,j}(t, m) = A_{i,j}(t-1, l) + \delta_{l,i}\delta_{m,j} \\
+	& B_i(o, t, m) = B_i(o, t-1, l) + \delta_{m,i}\delta_{o,o_t}
+\end{aligned}
+\end{equation}
+avec $\delta{i,j} = 1$ si $i=j$, 0 sinon et $l = \psi(m)$ (voir équation \ref{eq:viterbi}).
+
+% ENTRAINEMENT BAUM WELCH LINEAIRE
+\paragraph{Implémentation}
+\subsection{Entraînement Baum-Welch}
+\paragraph{Théorie}
+Rappelons que l'algorithme Baum-Welch définit $A_{i,j}(O)$ et $B_i(o, O)$ qui sont des concepts assez proches des comptes utilisés par l'entrainement Viterbi, sauf qu'au lieu de considérer uniquement le chemin optimal ce sont tous les chemins qui sont pris. Le développement effectué dans la section précédente est en conséquence également applicable à l'entrainement Baum-Welch. En effet, \cite{MM} définit les $A_{i,j}(t,m)$ pour Baum-Welch comme les $A_{i,j}(O)$ sauf qu'au lieu de considérer l'entièreté de la séquence $O$, $A_{i,j}(t,m)$ ne prend en compte que les chemins d'états finissant dans l'état $m$ à la position $t$ de la séquence ($B_i(o, t, m)$ est obtenu analogiquement pour les émissions). De plus, \cite{Ch} utilise les variables $backward$ pour permettre d'obtenir les probabilités de tous les chemins, en ne gardant en mémoire que les valeurs $\beta_{t-1}$. \\
+
+Intuitivement, l'obtention des scores de la récursion suivante pour tous les $1 \leq m \leq N$ requiert donc \textit{d'appliquer l'algorithme backward} aux scores $A_{i,j}(t,m)$ en remplaçant les variables \textit{backward} par les scores $A_{i,j}(t+1,n)$ pour $1 \leq n \leq N$ puisque pour obtenir le score des transitions arrivant en $m$ il faut considérer les scores des transitions de $i$ à $j$ de tous les états calculés pendant la récursion précédente. Ensuite, à ce score est ajouté la probabilité d'avoir la transition de $i$ à $j$ à la position $t+1$ de la séquence si $i=m$ en utilisant $\beta_{t+1}(j)$ (voir \cite{Ch} pour une description formelle).
+%\begin{equation}
+%\begin{aligned}
+%& A_{i,j}(t,m)
+%\begin{aligned}
+%	 &=  \ \beta_{t+1}(j) a_{m,j} b_j(o_{t+1}) \delta_{i,m} \\
+%			&+ \sum_{n=1}^N a_{m,n} A_{i,j}(t+1,n) b_n(o_{t+1})
+%\end{aligned}t
+%\\
+%& B_i(o, t,m)
+%\begin{aligned} 
+%	& = \ \beta_t(m) score(o_t,o,i) \delta_{m,i} \\
+%	& + \sum_{n=1}^N b_n(o_{t+1}) a_{m,n} B_i(o, t+1,n)
+%\end{aligned}
+%\end{aligned}
+%\end{equation} 
+
+
+\paragraph{Implémentation}
+% \subsection{Entraînement EM stochastique}
+\section{Modifications avec l'ajout d'états silencieux}
+Prendre en compte les états silencieux lors de l'implémentation d'un HMM a requit une attention particulière. Nous décrivons dans cette section les quelques modifications supplémentaires qu'ils ont apportés aux algorithmes.  \\
+
+\subsection{\textit{Forward}, \textit{backward} et Viterbi avec états silencieux}
+\cite{Durbin} explique, bien que de façon non-exhaustive, comment intégrer des états silencieux aux algorithmes \textit{forward}, \textit{backward} et Viterbi. Étant donné que le traitement est similaire aux trois algorithmes, nous choisissons de décrire les changements apportés à l'algorithme \textit{forward} en détails et de donner une adaptation de ces changements aux autres algorithmes.
+
+Rappelons tout d'abord que la variable \textit{forward} $\alpha_t(i)$ détermine la probabilité d'observer $o_1\dots o_t$ et d'arriver à $q_t =  S_i$ et est calculée récursivement via l'équation 1. Remarquons d'entrée que cette récusion n'est pas valable avec des états silencieux étant donné que si l'état $i$ est silencieux alors $b_i(o_t)$ renvoie $0$, garder l'équation $1$ en l'état ignorerait donc complètement les états silencieux lors du calcul des valeurs de $\alpha$. Comment donc ajuster l'équation \ref{eq:forward} afin de ne pas ignorer les états silencieux ? Il faut d'abord réaliser que si $i$ n'est \textit{pas} silencieux, $\alpha_t(i)$ \textit{consomme} le symbole $t$ de la séquence $O$. \textit{A contrario} avec $i$ un état silencieux, $\alpha_t(i)$ ne \textit{consomme pas} le symbole $t$. Dès lors, les calculs des $\alpha_t(i)$ des états silencieux nécessitent les $\alpha_t(j)$, donc les variables \textit{forward} de la récursion actuelle, afin de \textit{consommer} le symbole $t$ ! \\
+
+Ainsi, le calcul $\alpha_t(i)$ avec $i$ silencieux nécessite d'avoir déjà trouvé les valeurs $\alpha_t(j)$ des états non-silencieux d'une part mais aussi des états silencieux qui précèdent $i$ d'autre part puisque $i$ ne \textit{consomme} pas le symbole $t$ et sa valeur dépend donc aussi de tous les \textit{chemins silencieux} de la récursion $t$ ! La récursion formelle qui en découle est décrite par \cite{Durbin} avec $t=2\dots T$ et $S_{silent}$ l'ensemble des états $i \in S$ tel que $i$ est silencieux 
+\begin{equation}
+\alpha_t(i) = 
+\begin{cases}
+	\Big[ \sum_{j=1}^{N}\alpha_{t-1}(j)a_{j,i} \Big] b_i(o_t), & i \in S \setminus S_{silent} \\
+	\sum_{j=1}^{N}\alpha_{t}(j)a_{j,i}, & i \in S_{silent}
+\end{cases}
+\end{equation}
+Nous ajoutons que lors des calculs des variables $forward$ initiales, il convient également d'appliquer le raisonnement développé dans le paragraphe précédent en ce que $\alpha_1(i)$ pour $i$ non-silencieux peut être non-nul même si $\pi_i = 0$ s'il existe un \textit{chemin silencieux} entre l'état initial et $i$. \\
+
+Au niveau de l'implémentation, afin de parcourir les états silencieux dans l'ordre et donc respecter le raisonnement ci-dessus, nous effectuons un tri topologique sur le sous-graphe constitué uniquement d'états silencieux. Ce tri est alors placé à la fin du vecteur d'états pour s'assurer qu'en parcourant ce vecteur dans l'ordre, les $\alpha_t(j)$ des états $j$ non-silencieux soient déjà obtenus lors du calcul des variables \textit{forward} des états silencieux. \\
+
+\cite{Durbin} explique comment facilement étendre ceci aux algorithmes \textit{backward} et Viterbi. La modification nécessaire pour le premier algorithme est assez intuitive car elle réside dans le parcourt des états silencieux dans l'ordre topologique inverse puisque le \textit{backward} algorithm s'exécute \textit{en arrière}. Pour le second, l'ajustement théorique est encore plus trivial puisqu'il est uniquement nécessaire de remplacer la somme par le maximum. Toutefois, la mise en pratique est plus délicate au niveau du retour en arrière étant donné que l'ajout de chemins silencieux fait en sorte que l'état précédent pointé par $\phi$ pour les états silencieux n'est pas obligatoirement un état en $t-1$ !
+
+\subsection{Entrainement Viterbi et Baum-Welch avec états silencieux}
+Les articles utilisés pour implémenter les algorithmes des HMMs en mémoire linéaire ne développent pas le cas particulier des états silencieux. L'ajout d'un traitement pour les états silencieux dans les algorithmes en mémoire linéaire Viterbi et Baum-Welch fournis avec la librairie est donc issu d'un bref travail de réflexion que nous introduisons ici, bien qu'il soit directement inspiré du travail dans \cite{Durbin} expliqué dans la section précédente.
+
+\paragraph{Viterbi}
+Lors du calcul des comptes $A_{i,j}(t, m)$, nous considérons pour l'instant n'avoir qu'une seule valeur de retour en arrière pour l'itération $t$. Or, comme démontré précédemment, le nombre de retours en arrière entre $t$ et $t-1$ dépend de la longueur du chemin d'états silencieux. Ainsi, au lieu d'incrémenter le compte $A_{i,j}(t-1, l)$ si $l=i$ et $m=j$, il faudra incrémenter le compte si \textit{un des états le long du chemin d'états silencieux vaut $i$}. 
+
+\paragraph{Baum-Welch}
+L'ajustement de l'algorithme Baum-Welch en mémoire linéaire pour les états silencieux semble \textit{a priori} plus complexe. Cependant, en constatant assez intuitivement que la récursion des scores $A_{i,j}(t, m)$ est tout à fait équivalente à la récursion des variables \textit{backward} en substituant $\beta_j(o_{t+1})$ par le score $A_{i,j}(t+1, n)$, il vient qu'il suffit d'appliquer les mêmes changements apportés dans l'algorithme \textit{backward} décrits ci-dessus aux calculs des scores $A_{i,j}(t, m)$.
+
+
+
+
+% \paragraph{Entrainement EM stochastique} 
+\section{Résultats}
+\subsection{Tests des fonctionnalités}
+\subsection{Utilisation de la mémoire}
+\section{Exemples d'utilisation de la librairie}
+\section{Conclusion}
+
+
+
+
+\footnotesize
+\bibliographystyle{apalike}
+\bibliography{memoire}
+
+
+
+
+\end{document}

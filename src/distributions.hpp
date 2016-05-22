@@ -6,6 +6,7 @@
 #include <map>
 #include <numeric>
 #include <functional>
+#include <fstream>
 #include "constants.hpp"
 #include "utils.hpp"
 
@@ -31,12 +32,14 @@ class Distribution {
 private:
 	std::string _name;
 	bool _log;
-public:
+
+protected:
 	Distribution() : 
 		Distribution(distribution_config::kDistributionName) {}
 	Distribution(const std::string& name) : _name(name), _log(distribution_config::kDefaultLogUse) {}
 	Distribution(const Distribution& other) : _name(other._name), _log(other._log) {}
 
+public:
 	virtual std::string name() const { return _name; }
 	virtual bool is_discrete() const { return false; }
 	virtual bool is_continuous() const { return false; }
@@ -55,6 +58,8 @@ public:
 	virtual double& operator[] (double) = 0;
 	virtual bool operator==(const Distribution& other) const = 0;
 	virtual bool operator!=(const Distribution& other) const = 0;
+	virtual void save(std::ofstream&) = 0;
+	virtual void load(std::ifstream&) = 0;
 	/* For polymorphic use */
 	virtual Distribution* clone() const = 0;
 	virtual ~Distribution() {}
@@ -70,12 +75,12 @@ std::ostream& operator<<(std::ostream& out, const Distribution& dist){
 class DiscreteDistribution : public Distribution{
 private:
 	std::map<std::string, double> _distribution;
+protected:
+	DiscreteDistribution(const std::string& name) :
+		Distribution(name), _distribution() {}
 public:
 	DiscreteDistribution() : 
 		DiscreteDistribution(distribution_config::kDiscreteDistributionName) {}
-
-	DiscreteDistribution(const std::string& name) :
-		Distribution(name), _distribution() {}
 
 	DiscreteDistribution(std::initializer_list<std::pair<const std::string, double>> distribution) : 
 		Distribution(distribution_config::kDiscreteDistributionName), _distribution(distribution) {}
@@ -120,6 +125,32 @@ public:
 		});
 		str += "-> sum " + std::to_string(prob_sum());
 		return str;
+	}
+
+	void save(std::ofstream& out) {
+		bool used_log = uses_log_probabilities();
+		log_probabilities(false);
+		out << _distribution.size() << std::endl;
+		for(auto& entry : _distribution){
+			out << entry.first << '>' << entry.second << std::endl;
+		}
+
+		log_probabilities(used_log);
+	}
+
+	void load(std::ifstream& in) {
+		log_probabilities(false);
+		std::string line;
+		std::string symbol;
+		std::string prob_str;
+		std::size_t num_symbols;
+		std::getline(in, line);
+		num_symbols = (std::size_t) stoi(line);
+		for(std::size_t i = 0; i < num_symbols; ++i){
+			std::getline(in, line);
+			std::tie(symbol, prob_str) = utils::split_first(line, global_config::kProbabilitySeparator);
+			_distribution[symbol] = std::stod(prob_str);
+		}
 	}
 
 	virtual void log_probabilities(bool use_log) {
@@ -184,7 +215,6 @@ public:
 	}
 
 	virtual double& operator[] (double symbol) {
-		std::cout<<"call double"<<std::endl;
 		return operator[](std::to_string(symbol));
 	}
 
@@ -208,25 +238,31 @@ public:
 
 
 class ContinuousDistribution : public Distribution {
-public:
-	ContinuousDistribution() : 
-		ContinuousDistribution(distribution_config::kContinuousDistributionName) {}
+protected:
 	ContinuousDistribution(const std::string& name) : 
 		Distribution(name) {}
 
+public:
+	ContinuousDistribution() : 
+		ContinuousDistribution(distribution_config::kContinuousDistributionName) {}
+
 	bool is_continuous() const { return true; }
+	virtual bool is_normal() const { return false; }
+	virtual bool is_uniform() const { return false; }
 	virtual ~ContinuousDistribution() {}
 };
 
 class NormalDistribution : public ContinuousDistribution {
 public:
 	NormalDistribution() : ContinuousDistribution(distribution_config::kNormalDistributionName) {}
+	bool is_normal() const { return true; }
 	virtual ~NormalDistribution() {}
 };
 
 class UniformDistribution : public ContinuousDistribution {
 public:
 	UniformDistribution() : ContinuousDistribution(distribution_config::kUniformDistributionName) {}
+	bool is_uniform() const { return true; }
 	virtual ~UniformDistribution() {}
 };
 

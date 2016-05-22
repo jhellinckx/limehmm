@@ -53,15 +53,26 @@ namespace utils {
 		}
 	}
 
-	template <typename T>
-	class to_string {
-		template <typename C> static char test(char[sizeof(&C::to_string)]);
-		template <typename C> static long test(...);    
-	public:
-		static bool exists() {
-			return sizeof(test<T>(0)) == sizeof(char);	
+	// template <typename T>
+	// class to_string {
+	// 	template <typename C> static char test(char[sizeof(&C::to_string)]);
+	// 	template <typename C> static long test(...);    
+	// public:
+	// 	static bool exists() {
+	// 		return sizeof(test<T>(0)) == sizeof(char);	
+	// 	}
+	// };
+
+	extern std::pair<std::string, std::string> split_first(const std::string& s, char c){
+		std::size_t split_i = 0;
+		bool found = false;
+		while(!found && split_i < s.length()){
+			if(s[split_i] == c){ found = true; }
+			else{ ++split_i; }
 		}
-	};
+		if(split_i == s.length()) { return std::make_pair(s, ""); }
+		return std::make_pair(s.substr(0, split_i), s.substr(split_i + 1, std::string::npos));
+	}
 }
 
 #endif

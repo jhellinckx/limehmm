@@ -1,12 +1,14 @@
-CC = g++ -std=c++11
-CPPFLAGS = -g -O0 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
+CXXFLAGS = -std=c++11 -g -O0 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wconversion -Weffc++ -Wctor-dtor-privacy -Woverloaded-virtual -Wconversion -Wsign-promo
+TARGET = hmm_test
+LDFLAGS = -lm
 
+${TARGET}: constants.o hmm_algorithms.o hmm_test.o
+	${CXX} -o $@ $^ ${LDFLAGS}
 
-all: hmm_test
-	./hmm_test
+.PHONY: clean mrproper
 
-hmm_test: hmm_test.cpp
-	${CC} ${CPPFLAGS} $^ -o $@ 
+clean:	
+	rm -f *.o
 
-clean: 
-	rm -f hmm_test
+mrproper: clean
+	rm -f ${TARGET}
