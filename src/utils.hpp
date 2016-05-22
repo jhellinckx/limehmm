@@ -11,68 +11,16 @@
 #include "constants.hpp"
 
 namespace utils {
-	extern const double kInf =  std::numeric_limits<double>::infinity();
-	extern const double kNegInf = -std::numeric_limits<double>::infinity();
+	extern const double kInf;
+	extern const double kNegInf;
 
-	extern double round_double(double d, int precision = global_config::kDoublePrecision){
-		return round(d * pow(10, precision)) / pow(10, precision);
-	}
+	double round_double(double, int = global_config::kDoublePrecision);
 
-	extern double sum_log_prob(double log_x, double log_y){
-		// prob(x) == inf, prob(y) == inf
-		if(log_x == kInf || log_y == kInf) return kInf;
-		// prob(x) == 0
-		if(log_x == kNegInf) return log_y;
-		if(log_y == kNegInf) return log_x;
-		return (log_x > log_y) ? log_x + log(1 + exp(log_y - log_x)) : log_y + log(1 + exp(log_x - log_y));
-	}
+	double sum_log_prob(double log_x, double log_y);
 
-	template<typename Iterator>
-	extern double sum_log_prob(Iterator begin, Iterator end, double init_sum = kNegInf){
-		Iterator it = begin;
-		double log_sum = init_sum;
-		while(it != end){
-			log_sum = sum_log_prob(log_sum, *it);
-			++it;
-		}
-		return log_sum;
-	}
+	double log_normalize(double log_x, double log_sum);
 
-	extern double log_normalize(double log_x, double log_sum){
-		if(log_x == kInf || log_sum == kInf) return kInf;
-		if(log_x == kNegInf || log_sum == kNegInf) return kNegInf;
-		return log_x - log_sum;
-	}
-
-	template<typename Iterator>
-	extern void for_each_log_normalize(Iterator begin, Iterator end, double log_sum){
-		Iterator it = begin;
-		while(it != end){
-			*it = log_normalize(*it, log_sum);
-			++it;
-		}
-	}
-
-	// template <typename T>
-	// class to_string {
-	// 	template <typename C> static char test(char[sizeof(&C::to_string)]);
-	// 	template <typename C> static long test(...);    
-	// public:
-	// 	static bool exists() {
-	// 		return sizeof(test<T>(0)) == sizeof(char);	
-	// 	}
-	// };
-
-	extern std::pair<std::string, std::string> split_first(const std::string& s, char c){
-		std::size_t split_i = 0;
-		bool found = false;
-		while(!found && split_i < s.length()){
-			if(s[split_i] == c){ found = true; }
-			else{ ++split_i; }
-		}
-		if(split_i == s.length()) { return std::make_pair(s, ""); }
-		return std::make_pair(s.substr(0, split_i), s.substr(split_i + 1, std::string::npos));
-	}
+	std::pair<std::string, std::string> split_first(const std::string& s, char c);
 }
 
 #endif

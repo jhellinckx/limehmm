@@ -10,15 +10,12 @@
 
 class StateException : public std::logic_error {
 protected:
-	StateException(const std::string& message) :
-		std::logic_error(message) {}
+	StateException(const std::string&);
 };
 
 class StateDistributionException : public StateException {
 public:
-	template<typename T>
-	StateDistributionException(const T& t) : 
-		StateException(error_message::format("StateDistributionException: " + error_message::kSilentStateHasNoDistribution, t)) {}
+	StateDistributionException(const std::string&);
 };
 
 /* <----------------------------> */
@@ -35,112 +32,30 @@ private:
 	bool _free_transition;
 
 public:
-	State(const std::string& name) : _name(name), _distribution(nullptr), 
-		_free_emission(hmm_config::kDefaultFreeEmission), 
-		_free_transition(hmm_config::kDefaultFreeTransition) {}
-
-	State(const char* c_str) : State(std::string(c_str)) {}
-
-	explicit State(const std::string& name, const Distribution& distribution) : 
-		_name(name), _distribution(nullptr),
-		_free_emission(hmm_config::kDefaultFreeEmission), 
-		_free_transition(hmm_config::kDefaultFreeTransition) {
-			_distribution = distribution.clone();
-	} 
-
-	State(const State& other) : _name(other._name), _distribution(nullptr), 
-	_free_emission(other._free_emission), _free_transition(other._free_transition) {
-		if(other._distribution != nullptr){
-			_distribution = other._distribution->clone();
-		}
-	}
-
-	State(State&& other) : _name(std::move(other._name)), _distribution(other._distribution),
-	_free_emission(other._free_emission), _free_transition(other._free_transition) {
-		other._distribution = nullptr;
-	}
-
-	State& operator=(const State& other){
-		if(this != &other){
-			_name = other._name;
-			_free_emission = other._free_emission;
-			_free_transition = other._free_transition;
-			if(_distribution != nullptr){
-				delete _distribution;
-			}
-			_distribution = other._distribution->clone();
-		}
-		return *this;
-	}
-
-	State& operator=(State&& other){
-		if(this != &other){
-			_name = std::move(other._name);
-			_free_emission = other._free_emission;
-			_free_transition = other._free_transition;
-			if(_distribution != nullptr){
-				
-				delete _distribution;
-				
-			}
-			_distribution = other._distribution;
-			other._distribution = nullptr;
-		}
-		return *this;
-	}
-
-	inline bool operator==(const State& other) const {
-		return _name == other.name();
-	}
-
-	inline bool operator!=(const State& other) const {
-		return ! operator==(other);
-	}
-
-	std::string to_string() const {
-		return _name;
-	}
-
-	bool has_free_emission() const { return _free_emission; }
-	bool has_free_transition() const { return _free_transition; }
-	void fix_emission() { _free_emission = false; }
-	void fix_transition() { _free_transition = false; }
-	void free_emission() { _free_emission = true; }
-	void free_transition() { _free_transition = true; }
-
-	Distribution& distribution() const {
-		if(_distribution != nullptr){
-			return *_distribution;	
-		}
-		else{
-			throw StateDistributionException(*this);
-		}
-	}
-
-	void set_distribution(const Distribution& dist){
-		if(_distribution != nullptr){
-			delete _distribution;
-		}
-		_distribution = dist.clone();
-	}
-
-	std::string name() const { return _name; }
-	void set_name(const std::string& name) { _name = name; }   
-
-	bool is_silent() const { 
-		return _distribution == nullptr || _distribution->empty();
-	}
-
-	virtual ~State(){
-		if(_distribution != nullptr) { delete _distribution; }
-	}
-
+	State(const std::string&);
+	State(const char*);
+	State(const std::string&, const Distribution&);
+	State(const State&);
+	State(State&&);
+	State& operator=(const State&);
+	State& operator=(State&&);
+	bool operator==(const State&) const;
+	bool operator!=(const State&) const;
+	std::string to_string() const;
+	bool has_free_emission() const;
+	bool has_free_transition() const;
+	void fix_emission();
+	void fix_transition();
+	void free_emission();
+	void free_transition();
+	Distribution& distribution() const;
+	void set_distribution(const Distribution&);
+	std::string name() const;
+	void set_name(const std::string&);
+	bool is_silent() const;
+	virtual ~State();
 };
 
-std::ostream& operator<<(std::ostream& out, const State& state){
-	out << state.to_string();
-	return out;
-}
-
+std::ostream& operator<<(std::ostream& out, const State& state);
 
 #endif

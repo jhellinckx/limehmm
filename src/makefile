@@ -2,8 +2,8 @@ CXXFLAGS = -std=c++11 -g -O0 -Wpedantic -Wall -Wextra -Winit-self -Winline -Wcon
 TARGET = hmm_test
 LDFLAGS = -lm
 
-${TARGET}: constants.o hmm_algorithms.o hmm_test.o
-	${CXX} -o $@ $^ ${LDFLAGS}
+${TARGET}: state.o utils.o distributions.o constants.o hmm_algorithms.o hmm_test.o
+	${CXX} -o $@ $^ ${LDFLAGS} && ./${TARGET}
 
 .PHONY: clean mrproper
 

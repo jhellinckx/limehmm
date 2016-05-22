@@ -638,7 +638,11 @@ public:
 				vec_to_normalize.push_back(log(prob));
 			}
 			if(prob_sum != 1.0 && normalize){
-				utils::for_each_log_normalize(vec_to_normalize.begin(), vec_to_normalize.end(), log(prob_sum));
+				std::vector<double>::iterator it = vec_to_normalize.begin();
+				while(it != vec_to_normalize.end()){
+					*it = utils::log_normalize(*it, log(prob_sum));
+					++it;
+				}
 			}
 			std::size_t i = 0;
 			for(double& log_prob : vec_to_normalize){
