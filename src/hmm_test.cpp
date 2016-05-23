@@ -100,6 +100,36 @@ void tests_results(){
 	if(failed > 0) throw std::runtime_error("Tests failed.");
 }
 
+void round_all(std::vector<double>& vec, int precision){
+	for(auto& d : vec){
+		d = utils::round_double(d, precision);
+	}
+}
+
+void round_all(Matrix& matrix, int precision){
+	for(auto& row : matrix){
+		round_all(row, precision);
+	}
+}
+
+void round_all(std::vector<DiscreteDistribution>& dists, int precision){
+	for(auto& dist : dists){
+		dist.round(precision);
+	}
+}
+
+void exp_all(std::vector<double>& vec){
+	for(auto& d : vec){ d = exp(d); }
+}
+
+void exp_all(Matrix& matrix){
+	for(auto& row : matrix) { exp_all(row); }
+}
+
+void exp_all(std::vector<DiscreteDistribution>& dists){
+	for(auto& dist : dists){ dist.log_probabilities(false); }
+}
+
 int main(){
 	try{
 		/* Create hmm examples. */
