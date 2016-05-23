@@ -70,8 +70,8 @@ namespace hmm_config {
 
 	extern const double kDefaultTransitionPseudocount;
 	extern const double kDefaultConvergenceThreshold;
-	extern const unsigned int kDefaultMaxIterationsViterbi;
-	extern const unsigned int kDefaultMinIterationsViterbi;
+	extern const unsigned int kDefaultMaxIterations;
+	extern const unsigned int kDefaultMinIterations;
 
 	extern const std::string kDefaultHMMName;
 	extern const std::string kDefaultStartStateLabel;

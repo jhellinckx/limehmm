@@ -62,8 +62,8 @@ namespace hmm_config {
 
 	const double kDefaultTransitionPseudocount = 0;
 	const double kDefaultConvergenceThreshold = 1e-9;
-	const unsigned int kDefaultMaxIterationsViterbi = 1e8;
-	const unsigned int kDefaultMinIterationsViterbi = 0;
+	const unsigned int kDefaultMaxIterations = 1e8;
+	const unsigned int kDefaultMinIterations = 0;
 
 	const std::string kDefaultHMMName = "HiddenMarkovModel";
 	const std::string kDefaultStartStateLabel = "begin_state";
