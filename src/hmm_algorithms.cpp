@@ -11,6 +11,7 @@
 #include <iomanip> // std::setprecision
 #include <tuple>
 #include <iostream>
+#include <ctime>
 #include "utils.hpp"
 #include "constants.hpp"
 #include "hmm_algorithms.hpp"
@@ -117,6 +118,7 @@ std::vector<double> LinearMemoryForwardAlgorithm::forward_step(const std::vector
 std::pair<std::vector<double>, double> LinearMemoryForwardAlgorithm::forward_terminate(const std::vector<double>& alpha_T){
 	double log_prob = utils::kNegInf;
 	std::vector<double> alpha_end(_model->A.size(), utils::kNegInf);
+	//utils::mem_info();
 	if(_model->is_finite){
 		/* Sum all and add end transitions. */
 		for(std::size_t i = 0; i < alpha_T.size(); ++i){
@@ -238,6 +240,7 @@ std::tuple<std::vector<double>, std::vector<double>, double> LinearMemoryBackwar
 		beta_end[i] = _model->pi_begin[i] + beta_0[i];
 		log_prob = utils::sum_log_prob(log_prob, beta_end[i]);
 	}
+	//utils::mem_info();
 	return std::make_tuple(beta_0, beta_end, log_prob);
 }
 
@@ -462,6 +465,7 @@ std::pair<std::vector<std::string>, double> LinearMemoryViterbiDecodingAlgorithm
 			phi = viterbi_step(phi, psi, t, sequence);
 		}
 		std::size_t max_state_index = viterbi_terminate(phi);
+		//utils::mem_info();
 		double max_phi_T = phi[max_state_index];
 		if(max_phi_T != utils::kNegInf && max_state_index < _model->A.size()){
 			std::vector<std::size_t> path_indices = psi.from(max_state_index);

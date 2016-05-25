@@ -8,6 +8,7 @@
 #include <limits>
 #include <typeinfo>
 #include <type_traits>
+#include <mach/mach.h>
 #include "constants.hpp"
 
 namespace utils {
@@ -21,6 +22,8 @@ namespace utils {
 	double log_normalize(double log_x, double log_sum);
 
 	std::pair<std::string, std::string> split_first(const std::string& s, char c);
+
+	void mem_info();
 }
 
 #endif

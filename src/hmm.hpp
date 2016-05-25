@@ -116,6 +116,9 @@ public:
 	std::string name() const;
 	void set_name(const std::string& name);
 
+	/* Returns the hmm graph */
+	Graph<State> get_graph();
+
 	/* Get the number of states of the hmm */
 	std::size_t num_states() const;
 	/* Get the number of transitions of the hmm */

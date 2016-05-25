@@ -130,6 +130,110 @@ void exp_all(std::vector<DiscreteDistribution>& dists){
 	for(auto& dist : dists){ dist.log_probabilities(false); }
 }
 
+HiddenMarkovModel generate_random(std::size_t num_states, std::vector<std::string> alphabet,
+	std::size_t n_trans, std::size_t n_emi){
+		std::size_t params = 0;
+		HiddenMarkovModel generated("generated");
+		std::vector<State> states;
+		states.reserve(num_states);
+		std::vector<std::string> not_emitted;
+		for(std::size_t i = 0; i < num_states; ++i){
+			not_emitted = alphabet;
+			DiscreteDistribution dist;
+			std::size_t emi = std::min(alphabet.size(), n_emi);	
+			for(std::size_t j = 0; j < emi; ++j){
+				std::size_t rand_emi = (std::size_t) rand() % emi;
+				++params;
+				dist[not_emitted[rand_emi]] = (std::size_t) rand() % 100;
+				not_emitted.erase(not_emitted.begin() + std::ptrdiff_t(rand_emi));
+				--emi;
+			}
+			State s("state_"+std::to_string(i), dist);
+			//s.fix_transition();
+			//s.fix_emission();
+			states.push_back(s);
+			generated.add_state(s);
+		}
+		std::vector<State> no_trans;
+		for(std::size_t i = 0; i < num_states; ++i){
+			no_trans = states;
+			std::size_t trans = std::min(num_states, n_trans);
+			for(std::size_t j = 0; j < trans; ++j){
+				std::size_t rand_trans = (std::size_t) rand() % trans;
+				generated.add_transition(states[i], no_trans[rand_trans], (std::size_t) rand() % 100);
+				no_trans.erase(no_trans.begin() + std::ptrdiff_t(rand_trans));
+				++params;
+				--trans;
+			}
+		}
+		no_trans = states;
+		std::size_t trans = std::min(num_states, n_trans);
+		for(std::size_t j = 0; j < trans; ++j){
+			std::size_t rand_trans = (std::size_t) rand() % trans;
+			generated.add_transition(generated.begin(), no_trans[rand_trans], (std::size_t) rand() % 100);
+			no_trans.erase(no_trans.begin() + std::ptrdiff_t(rand_trans));
+			++params;
+			--trans;
+		}
+		std::cout << params << std::endl;
+		generated.brew();
+		return generated;
+}
+
+void mem_bench() {
+	std::vector<std::string> alphabet = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
+	HiddenMarkovModel hmm = generate_random(100, alphabet, 5, 10);
+	
+	std::vector<std::size_t> lengths = {200};
+	std::vector<std::vector<std::string>> sequences;
+	std::size_t rand_symbol;
+	sequences.reserve(lengths.size());
+	for(std::size_t length : lengths){
+		std::vector<std::string> sequence;
+		sequence.reserve(length);
+		for(std::size_t i = 0; i < length; ++i){
+			rand_symbol = (std::size_t) rand() % alphabet.size();
+			sequence.push_back(alphabet[rand_symbol]);
+		}
+		sequences.push_back(sequence);
+	}
+
+	HiddenMarkovModel train1 = hmm;
+	//HiddenMarkovModel train2 = hmm;
+	// HiddenMarkovModel fwd = hmm;
+	// HiddenMarkovModel bwd = hmm;
+	// HiddenMarkovModel viter = hmm;
+
+	train1.set_training(LinearMemoryViterbiTraining(nullptr));
+	train1.train(sequences, 0.0, hmm_config::kDefaultConvergenceThreshold, 0, 1);
+
+	
+	//train2.set_training(LinearMemoryBaumWelchTraining(nullptr));
+	//train2.train(sequences, 0.0, hmm_config::kDefaultConvergenceThreshold, 0, 1);
+
+	
+	// std::cout << "Forward" << std::endl;
+	// for(std::size_t i = 0; i< sequences.size(); ++i){
+	// 	fwd.log_likelihood(sequences[i], true);	
+	// }
+	// std::cout << std::endl;
+	
+	
+	// std::cout << "Backward" << std::endl;
+	// for(std::size_t i = 0; i< sequences.size(); ++i){
+	// 	bwd.log_likelihood(sequences[i], false);	
+	// }
+	// std::cout << std::endl;
+
+	// std::cout << "Viterbi Decode" << std::endl;
+	// for(std::size_t i = 0; i< sequences.size(); ++i){
+	// 	viter.decode(sequences[i], false);	
+	// }
+	// std::cout << std::endl;
+}
+
+
+
 int main(){
 	try{
 		/* Create hmm examples. */

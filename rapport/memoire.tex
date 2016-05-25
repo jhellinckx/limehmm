@@ -5,12 +5,17 @@
 \usepackage[T1]{fontenc}
 \usepackage[francais]{babel}
 \usepackage{amssymb,amsmath}
+\usepackage{subfig}
+\usepackage{float}
+\usepackage{hyperref}
 
 
 \title{Développement d'une librairie pour les Modèles de Markov Cachés en mémoire linéaire}
 \author{Jérôme Hellinckx \\
 \mbox{}\\
-Université Libre de Bruxelles}
+Université Libre de Bruxelles, Belgique \\
+jerhelli@ulb.ac.be
+}
 
 \DeclareMathOperator*{\argmin}{\arg\!\min}
 \DeclareMathOperator*{\argmax}{\arg\!\max}
@@ -22,13 +27,15 @@ Université Libre de Bruxelles}
 
 % ABSTRACT
 \begin{abstract}
-Les Modèles de Markov Cachés (HMMs) sont des modèles probabilistes utilisés dans des domaines variés allant de l'analyse de séquences biologiques à la reconnaissance vocale. Un des problèmes récurrent concernant de tels modèles est leur grande consommation de la mémoire, dépendante de la taille de la séquence considérée. Des algorithmes en mémoire linéaire furent introduits ces dernières années. 
-Dans cet article, nous définissions brièvement les HMMs et leurs algorithmes ainsi que leurs équivalents en mémoire linéaire décrits par \cite{Ch, LM, MM}. Nous proposons ensuite une librairie \texttt{C++} permettant de construire et d'employer de tels modèles respectant la contrainte sur la mémoire et nous démontrons ses fonctionnalités.
+Un des problèmes récurrent auquel l'utilisation extensive des Modèles de Markov Cachés fait face est une demande conséquente d'espace mémoire qui est directement dépendante de la taille des données d'entrée. C'est dans ce cadre que des algorithmes en mémoire linéaire furent proposés ces dernières années. 
+Dans cet article, nous définissions brièvement les HMMs et leurs algorithmes ainsi que leurs équivalents en mémoire linéaire décrits par \cite{Ch, LM, MM}. Nous proposons également une librairie \texttt{C++} permettant de construire et d'employer de tels modèles respectant la contrainte sur la mémoire et nous démontrons son fonctionnement.
 \end{abstract}
 
 % INTRODUCTION
 \section{Introduction}
+Les Modèles de Markov Cachés (HMMs) sont des modèles probabilistes servant d'outil de modélisation et dont l'utilisation se retrouve dans des domaines nombreux et variés allant de la reconnaissance vocale à la bioinformatique pour l'analyse de séquences biologiques \citep{Intro}. Avoir recours aux algorithmes conventionnels permettant de résoudre les problèmes relatifs aux HMMs (ces problèmes sont décrits plus loin) n'est malheureusement pas toujours une solution acceptable étant donné que ces algorithmes procèdent à une consommation de la mémoire très copieuse pour de longues séquences \citep{Ch}. Dans l'optique de pallier à cela, des propositions d'algorithmes moins gourmands en mémoire ont vu le jour parmi la littérature scientifique. Mentionnons par exemple \cite{MM} qui ouvre le chemin vers une implémentation en mémoire linéaire de l'algorithme d'entrainement Baum-Welch ou encore \cite{Ch} qui montre comment implémenter le fameux problème de décodage en respectant mieux l'allocation de la mémoire. \\
 
+Cet article a pour objectif d'une part de récapituler le travail existant traitant de l'utilisation plus efficiente de la mémoire par les algorithmes des HMMs et d'autre part de proposer une librairie \texttt{C++} implémentant ces travaux. Pour réaliser cela, nous commençons par une rapide rappel sur les HMMs et leurs notations en poursuivant par la description des problèmes typiques qu'ils rencontrent. Nous introduisons alors l'équivalent des résolutions de ces problèmes en mémoire linéaire en expliquant en parallèle les choix faits par la librairie permettant leur implémentation. Nous finissions en dévoilant les résultats obtenus en comparant avec les résultats des travaux dont nous nous sommes inspirés.
 % 1) décrire fonctionnalités de la librairie
 % 2) objectif 
  
@@ -126,14 +133,15 @@ avec $P(O)$ la probabilité d'observation de la séquence O en $n$. Ajoutons qu'
 \section{Méthodes utilisées pour implémenter les HMMs en mémoire linéaire}
 Le problème qui se pose est donc de fournir une librairie permettant de construire des HMMs en fournissant les résolutions typiques aux problèmes basiques cités ci-dessus, tout en respectant la contrainte de la mémoire linéaire. Nous séparons les explications pour chaque problème en commençant à chaque fois par une approche théorique avant de développer brièvement un paragraphe sur l'implémentation en \texttt{C++} proposée par la librairie présentée. \\
 
-Avant de parcourir chaque problème, il s'avère pertinent de d'abord énoncer la stratégie générale adoptée par la librairie. L'approche adoptée est de respecter le design pattern \textit{Strategy} pour les algorithmes des HMMs. Dès lors les objets HMMs proposés ne définissent pas eux-mêmes ces algorithmes, mais utilisent plutôt un de leurs attributs qui pointe vers l'algorithme qui a été donné à sa construction. Ce découplage permet donc de fournir lors de la construction n'importe quel algorithme pour n'importe quel problème. Ainsi, pour entrainer un objet HMM avec l'algorithme Baum-Welch linéaire, nous lui donnons la classe qui implémente cet algorithme lors de la construction et l'appel à la méthode d'entrainement du HMM délèguera l'entrainement à ladite classe. Remarquons qu'il est en conséquence très facile d'ajouter des algorithmes d'entrainement différent puisqu'il suffit d'ajouter une classe implémentant le nouvel algorithme désiré et de donner une instance de cette classe à l'objet HMM visé.  Notons aussi que tous ces algorithmes se situent dans le fichier \texttt{hmm\_algorithms.cpp}. 
+Avant de parcourir chaque problème, il s'avère pertinent de d'abord énoncer la stratégie générale adoptée par la librairie. L'approche adoptée est de respecter le design pattern \textit{Strategy} pour les algorithmes des HMMs. Dès lors les objets HMMs (instances de la classe \texttt{HiddenMarkovModel}) proposés ne définissent pas eux-mêmes ces algorithmes, mais utilisent plutôt un de leurs attributs qui pointe vers l'algorithme qui a été donné à sa construction. Ce découplage permet donc de fournir lors de la construction n'importe quel algorithme pour n'importe quel problème. Ainsi, pour entrainer un objet HMM avec l'algorithme Baum-Welch linéaire, nous lui donnons la classe qui implémente cet algorithme lors de la construction et l'appel à la méthode d'entrainement du HMM délèguera l'entrainement à ladite classe. Remarquons qu'il est en conséquence très facile d'ajouter des algorithmes d'entrainement différents puisqu'il suffit d'ajouter une classe implémentant le nouvel algorithme désiré et de donner une instance de cette classe à l'objet HMM visé.  Notons aussi que tous ces algorithmes se situent dans le fichier \texttt{hmm\_algorithms.cpp}. 
 
 % FORWARD ET BACKWARD LINEAIRES
 \subsection{Algorithmes \textit{forward} et \textit{backward}}
 \paragraph{Théorie}
-Au lieu de stocker les variables \textit{forward} et \textit{backward} dans des matrices $M \times T$, nous implémentons les algorithmes \textit{forward} et \textit{backward} en ne gardant simultanément en mémoire que deux vecteurs de taille $M$. Ceci découle de l'observation suivante : à chaque récursion $t$, il nous faut uniquement connaitre les valeurs de $\alpha_{t-1}$ pour l'équation \ref{eq:forward} et $\beta_{t-1}$ pour l'équation \ref{eq:backward} \citep{MM}. Cette considération permet donc que la mémoire ne dépende pas de la taille $T$ de la séquence $O$ analysée et ne s'accompagne pas d'une perte de performance pour le problème d'évaluation et le problème de décodage.
+Un bref coup d'oeil aux équations \ref{eq:forward} et \ref{eq:backward}  permet d'observer qu'à chaque récursion $t$, le calcul des variables \textit{forward} $\alpha_t$ et \textit{backward} $\beta_t$ ne nécessite que de connaitre les valeurs de $\alpha_{t-1}$ et $\beta_{t+1}$ obtenues lors de la récursion précédente \citep{MM}. Cette considération permet donc que l'utilisation de la mémoire ne dépende pas de la taille $T$ de la séquence $O$ analysée et ne s'accompagne pas d'une perte de performance pour le problème d'évaluation et le problème de décodage.
 
 \paragraph{Implémentation}
+Au lieu de stocker les variables \textit{forward} et \textit{backward} dans des matrices $M \times T$, les algorithmes \textit{forward} et \textit{backward} que nous avons implémentés ne gardent simultanément en mémoire que deux vecteurs de taille $M$ (par exemple l'algorithme \textit{forward} utilise les vecteurs \texttt{alpha\_prev\_t} et \texttt{alpha\_t} dans sa méthode \texttt{forward\_step} appelée à chaque itération).
 
 % DECODAGE VITERBI LINEAIRE
 \subsection{Décodage Viterbi}
@@ -143,6 +151,10 @@ L'observation permettant de respecter la contrainte mémoire pour les algorithme
 De plus, \cite{Ch} décrit une méthode permettant de ne pas avoir recourt à une matrice $M \times T$ pour les valeurs de retour en arrière $\psi$. En effet, l'article avance que l'utilisation d'une liste chaînée permet de réduire l'espace mémoire alloué pour $\psi$ en faisant l'observation que les chemins de retour en arrière convergent vers le chemin d'états optimal, et reviennent donc ensemble, en arrière, aux valeurs $\psi_1$. Dès lors, l'utilisation d'une liste chainée permet de se \textit{débarrasser} des chemins d'états non-optimaux.
 
 \paragraph{Implémentation}
+La difficulté dans l'implémentation du décodage Viterbi en mémoire linéaire proposé par \cite{Ch} réside dans la nécessité de libérer la mémoire utilisée par les chemins d'états non-optimaux. Cette difficulté est toutefois levée si l'implémentation est faites dans un langage utilisant un \textit{garbage collector}, \cite{Ch} par exemple utilise \texttt{Java}. \\
+
+ Le même article propose en parallèle une solution pour une implémentation en \texttt{C++} : l'emploi de pointeurs partagés (\texttt{shared\_ptr}).
+De là, introduisons la structure de donnée \texttt{Traceback} utilisée dans notre libraire, cette structure n'étant autre que l'implémentation de $\psi$. \texttt{Traceback} possède deux vecteurs de pointeurs partagés de taille $M$, soit un \textit{courant} et un \textit{précédent}. À chaque itération de la procédure de décodage, le $\psi$ (voir l'équation \ref{eq:viterbi}) obtenu pour chaque état $i$ détermine vers quel pointeur partagé du vecteur \textit{précédent} va pointer le pointeur partagé $i$ du vecteur \textit{courant}. Ainsi, à la fin de l'itération $t$, tous les pointeurs du vecteur \textit{courant} pointent vers un des pointeurs du vecteur \textit{précédent}. Et donc, comme expliqué dans la section théorique, tous les pointeurs du vecteur \textit{précédent} qui ne sont pas référencé par au moins un des pointeurs de \textit{courant} se trouvent sur un chemin non-optimal, nous pouvons en conséquence nous en débarrasser. Pour ce, avant de passer à la récursion suivante, nous copions le vecteur \textit{courant} dans le vecteur \textit{précédent} (méthode \texttt{next\_column}), les pointeurs non référencés ont leur compte de référence mis à $0$ (le vecteur \textit{précédent} maintenait ce compte à $1$) et sont donc supprimés. 
 
 % ENTRAINEMENT VITERBI LINEAIRE
 \subsection{Entraînement Viterbi}
@@ -158,21 +170,25 @@ En s'aidant des deux observations précédentes, \cite{LM} décrit un algorithme
 \end{itemize} 
 
 L'algorithme d'entrainement Viterbi effectue donc une récursion similaire au décodage Viterbi, en ce qu'il calcule $\phi_t$ à chaque $t$. \cite{LM} montre ensuite le calcul des  $A_{i,j}(t, m)$ et $B_i(o, t, m)$ pour la récursion $t$
-\begin{equation}
+\begin{equation} \label{eq:viterbitraining}
 \begin{aligned}
 	& A_{i,j}(t, m) = A_{i,j}(t-1, l) + \delta_{l,i}\delta_{m,j} \\
 	& B_i(o, t, m) = B_i(o, t-1, l) + \delta_{m,i}\delta_{o,o_t}
 \end{aligned}
 \end{equation}
-avec $\delta{i,j} = 1$ si $i=j$, 0 sinon et $l = \psi(m)$ (voir équation \ref{eq:viterbi}).
+avec $\delta{i,j} = 1$ si $i=j$, 0 sinon et $l = \psi(m)$ (voir équation \ref{eq:viterbi}). \\
+
+Puisque $A_{i,j}(t, m)$ détient uniquement les comptes du nombre de transitions de $i$ à $j$ arrivant en $m$, il est évident qu'il faudra avoir $M$ comptes pour chaque transition. Soit $\mathcal{T}$ l'ensemble des transitions entrainées (transitions \textit{libres}) et $\mathcal{E}$ l'ensemble des émissions entrainées (émissions \textit{libres}), le nombre de comptes à garder en mémoire à chaque itération est donc de $|S \times \mathcal{T}| + |S \times \mathcal{E}|$. 
+
+\paragraph{Implémentation}
+Nous représentons les comptes $A_{i,j}(t, m)$ et $B_i(o, t, m)$ via des instances de \texttt{TransitionScore} et \texttt{EmissionScore}. Ces objets utilisent des matrices de dimensions $|S| \times |\mathcal{T}|$ et $|S| \times |\mathcal{E}|$ pour stocker les comptes des paramètres libres de l'HMM (ces transitions et émissions libres sont données par le modèle entrainé). De plus, afin de garder une trace des retours en arrière au temps $t$, l'algorithme utilise un objet \texttt{Traceback} qu'il réinitialise (\texttt{reset}) avant le passage au temps suivant (puisqu'il n'est pas nécessaire de connaitre de retours en arrières autre que ceux au temps $t$). Ainsi, pour mettre à jour les comptes arrivants à l'état $m$, l'implémentation se sert du \texttt{Traceback} en partant de $m$ pour incrémenter les comptes selon l'équation \ref{eq:viterbitraining}.
 
 % ENTRAINEMENT BAUM WELCH LINEAIRE
-\paragraph{Implémentation}
 \subsection{Entraînement Baum-Welch}
 \paragraph{Théorie}
-Rappelons que l'algorithme Baum-Welch définit $A_{i,j}(O)$ et $B_i(o, O)$ qui sont des concepts assez proches des comptes utilisés par l'entrainement Viterbi, sauf qu'au lieu de considérer uniquement le chemin optimal ce sont tous les chemins qui sont pris. Le développement effectué dans la section précédente est en conséquence également applicable à l'entrainement Baum-Welch. En effet, \cite{MM} définit les $A_{i,j}(t,m)$ pour Baum-Welch comme les $A_{i,j}(O)$ sauf qu'au lieu de considérer l'entièreté de la séquence $O$, $A_{i,j}(t,m)$ ne prend en compte que les chemins d'états finissant dans l'état $m$ à la position $t$ de la séquence ($B_i(o, t, m)$ est obtenu analogiquement pour les émissions). De plus, \cite{Ch} utilise les variables $backward$ pour permettre d'obtenir les probabilités de tous les chemins, en ne gardant en mémoire que les valeurs $\beta_{t-1}$. \\
+Rappelons que l'algorithme Baum-Welch définit $A_{i,j}(O)$ et $B_i(o, O)$ qui sont des concepts assez proches des comptes utilisés par l'entrainement Viterbi, sauf qu'au lieu de considérer uniquement le chemin optimal ce sont tous les chemins qui sont pris. Le développement effectué dans la section précédente est en conséquence également applicable à l'entrainement Baum-Welch. En effet, \cite{MM} définit les $A_{i,j}(t,m)$ pour Baum-Welch comme les $A_{i,j}(O)$ sauf qu'au lieu de considérer l'entièreté de la séquence $O$, $A_{i,j}(t,m)$ ne prend en compte que les chemins d'états finissant dans l'état $m$ à la position $t$ de la séquence ($B_i(o, t, m)$ est obtenu analogiquement pour les émissions). De plus, \cite{Ch} utilise les variables $backward$ pour permettre d'obtenir les probabilités de tous les chemins, en ne gardant en mémoire que les valeurs $\beta_{t+1}$. \\
 
-Intuitivement, l'obtention des scores de la récursion suivante pour tous les $1 \leq m \leq N$ requiert donc \textit{d'appliquer l'algorithme backward} aux scores $A_{i,j}(t,m)$ en remplaçant les variables \textit{backward} par les scores $A_{i,j}(t+1,n)$ pour $1 \leq n \leq N$ puisque pour obtenir le score des transitions arrivant en $m$ il faut considérer les scores des transitions de $i$ à $j$ de tous les états calculés pendant la récursion précédente. Ensuite, à ce score est ajouté la probabilité d'avoir la transition de $i$ à $j$ à la position $t+1$ de la séquence si $i=m$ en utilisant $\beta_{t+1}(j)$ (voir \cite{Ch} pour une description formelle).
+Intuitivement, l'obtention des scores de la récursion suivante pour tous les $1 \leq m \leq N$ requiert donc \textit{d'appliquer l'algorithme backward} aux scores $A_{i,j}(t,m)$ en substituant les variables \textit{backward} par les scores $A_{i,j}(t+1,n)$ pour $1 \leq n \leq N$ puisque pour obtenir le score des transitions arrivant en $m$ il faut considérer les scores des transitions de $i$ à $j$ de tous les états calculés pendant la récursion précédente. Ensuite, à ce score est ajouté la probabilité d'avoir la transition de $i$ à $j$ à la position $t+1$ de la séquence si $i=m$ en utilisant $\beta_{t+1}(j)$ (voir \cite{Ch} pour une description formelle).
 %\begin{equation}
 %\begin{aligned}
 %& A_{i,j}(t,m)
@@ -188,15 +204,15 @@ Intuitivement, l'obtention des scores de la récursion suivante pour tous les $1
 %\end{aligned}
 %\end{aligned}
 %\end{equation} 
-
-
 \paragraph{Implémentation}
+Nous avons mentionné dans le paragraphe précédent la similarité de l'adaptation en mémoire linéaire pour les algorithmes d'entrainement Viterbi et Baum-Welch, en ce que les $A_{i,j}(t,m)$ et $B_i(o, t, m)$ utilisés par chaque algorithme sont des concepts tout à fait analogues. C'est pourquoi l'implémentation de l'algorithme Baum-Welch fournie dans la librairie utilise les mêmes structures de données \texttt{TransitionScore} et \texttt{EmissionScore} que pour l'implémentation de l'algorithme Viterbi. 
+
 % \subsection{Entraînement EM stochastique}
-\section{Modifications avec l'ajout d'états silencieux}
+\section{Modifications apportées par l'ajout d'états silencieux}
 Prendre en compte les états silencieux lors de l'implémentation d'un HMM a requit une attention particulière. Nous décrivons dans cette section les quelques modifications supplémentaires qu'ils ont apportés aux algorithmes.  \\
 
 \subsection{\textit{Forward}, \textit{backward} et Viterbi avec états silencieux}
-\cite{Durbin} explique, bien que de façon non-exhaustive, comment intégrer des états silencieux aux algorithmes \textit{forward}, \textit{backward} et Viterbi. Étant donné que le traitement est similaire aux trois algorithmes, nous choisissons de décrire les changements apportés à l'algorithme \textit{forward} en détails et de donner une adaptation de ces changements aux autres algorithmes.
+\cite{Durbin} explique, bien que de façon non-exhaustive, comment intégrer des états silencieux aux algorithmes \textit{forward}, \textit{backward} et Viterbi. Étant donné que le traitement est similaire aux trois algorithmes, nous choisissons de décrire les changements apportés à l'algorithme \textit{forward} en détails et de donner une adaptation de ces changements aux autres algorithmes. \\
 
 Rappelons tout d'abord que la variable \textit{forward} $\alpha_t(i)$ détermine la probabilité d'observer $o_1\dots o_t$ et d'arriver à $q_t =  S_i$ et est calculée récursivement via l'équation 1. Remarquons d'entrée que cette récusion n'est pas valable avec des états silencieux étant donné que si l'état $i$ est silencieux alors $b_i(o_t)$ renvoie $0$, garder l'équation $1$ en l'état ignorerait donc complètement les états silencieux lors du calcul des valeurs de $\alpha$. Comment donc ajuster l'équation \ref{eq:forward} afin de ne pas ignorer les états silencieux ? Il faut d'abord réaliser que si $i$ n'est \textit{pas} silencieux, $\alpha_t(i)$ \textit{consomme} le symbole $t$ de la séquence $O$. \textit{A contrario} avec $i$ un état silencieux, $\alpha_t(i)$ ne \textit{consomme pas} le symbole $t$. Dès lors, les calculs des $\alpha_t(i)$ des états silencieux nécessitent les $\alpha_t(j)$, donc les variables \textit{forward} de la récursion actuelle, afin de \textit{consommer} le symbole $t$ ! \\
 
@@ -223,18 +239,41 @@ Lors du calcul des comptes $A_{i,j}(t, m)$, nous considérons pour l'instant n'a
 \paragraph{Baum-Welch}
 L'ajustement de l'algorithme Baum-Welch en mémoire linéaire pour les états silencieux semble \textit{a priori} plus complexe. Cependant, en constatant assez intuitivement que la récursion des scores $A_{i,j}(t, m)$ est tout à fait équivalente à la récursion des variables \textit{backward} en substituant $\beta_j(o_{t+1})$ par le score $A_{i,j}(t+1, n)$, il vient qu'il suffit d'appliquer les mêmes changements apportés dans l'algorithme \textit{backward} décrits ci-dessus aux calculs des scores $A_{i,j}(t, m)$.
 
-
-
-
 % \paragraph{Entrainement EM stochastique} 
 \section{Résultats}
-\subsection{Tests des fonctionnalités}
-\subsection{Utilisation de la mémoire}
-\section{Exemples d'utilisation de la librairie}
-\section{Conclusion}
+Afin de s'assurer que les valeurs calculées par les algorithmes implémentés soient correctes,  tous ces algorithmes sont testés de façon extensive dans un fichier de test \texttt{hmm\_tests.cpp}. Les valeurs sur lesquels nous exécutons les assertions sont issues d'une part des outils HMM de \textsc{Matlab} et d'autre part d'une libraire python open source trouvable à l'adresse \url{https://github.com/jmschrei/pomegranate}. \\
+
+Vérifions maintenant que les algorithmes d'entrainement implémentés s'exécutent bien en mémoire linéaire par rapport à la taille de la séquence. Pour cela, nous générons un HMM avec $20$ états et $200$ paramètres libres à entrainer (le nombre de paramètres à entrainer reste bien évidemment constant pour ces tests étant donné que varier leur nombre ferait varier l'espace nécessaire pour stocker leur scores $A_{i,j}(t, m)$ et $B_i(o,t,m)$). La \textsc{Figure 1} illustre les résultats obtenus, sachant que le HMM utilisé est le même pour les deux algorithmes d'entrainement testés (Viterbi et Baum-Welch). Nous observons donc que la mémoire est utilisée linéairement par rapport à la taille des séquences, la contrainte sur la mémoire que nous nous sommes fixée est ainsi respectée. La \textsc{Figure 1} est bornée supérieurement par une taille de séquence à $500$ pour l'HMM considéré étant donné que toute valeur au-delà de cette limite ne changeait pas la mémoire utilisée par les deux algorithmes, prouvant encore que ces algorithmes sont bien en mémoire linéaire. \\
+
+\begin{figure}[H]
+  \centering
+  \subfloat{\includegraphics[scale=0.3]{lin_training.eps}\label{fig:f2}}
+  \caption{Utilisation de la mémoire}
+\end{figure}
+
+Les deux algorithmes allouent une quantité de mémoire proche l'une de l'autre ce qui est aisément explicable par le fait qu'ils utilisent un même nombre de scores qui dépend du nombre de paramètres entrainés et du nombre d'états de l'HMM, or, ces nombres sont égaux ici.
+
+Au niveau des performances, \cite{Ch} montrait déjà que la durée des itérations de l'algorithme Baum-Welch en mémoire linéaire grandissait exponentiellement avec le nombre d'états compris dans l'HMM. Nous obtenons les mêmes résultats avec la \textsc{Figure 3}. La \textsc{Figure 2} renseigne sur la durée d'une itération pour l'algorithme d'entrainement Viterbi. \cite{LM} démontrait le gain en temps d'exécution en utilisant cet algorithme au lieu de l'algorithme Baum-Welch. Nous remarquons un comportement similaire en comparant la \textsc{Figure 2} avec la \textsc{Figure 3}. 
+
+\begin{figure}[H]
+  \centering
+  \subfloat{\includegraphics[scale=0.3]{viterbi_time_state.eps}\label{fig:f2}}
+  \caption{Durée d'une itération d'entrainement}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \subfloat{\includegraphics[scale=0.3]{bw_time_state.eps}\label{fig:f2}}
+  \caption{Durée d'une itération d'entrainement}
+\end{figure}
 
 
+\section{Conclusion et perspectives}
+Nous avons présenté dans cet article une implémentation possible pour les algorithmes des HMMs en mémoire linéaire décrits par \cite{MM, Ch, LM}. Cette implémentation est visitable à l'adresse \url{https://github.com/jhellinckx/limehmm}. \\
 
+En plus d'une implémentation en mémoire linéaire, nous nous sommes également efforcés de permettre l'emploi d'états silencieux dans ces algorithmes, ce qui a rendu la tâche bien plus difficile étant donné que les articles introduisant ces algorithmes ne donnaient pas d'indication quant à la manière d'adapter lesdits algorithmes aux états silencieux. Nous nous sommes donc inspiré du travail fait par \cite{Durbin} pour ajuster l'implémentation. Bien qu'étant non-exhaustives, les propositions qui y sont décrites ainsi qu'une bonne compréhension des modifications sémantiques apportées par les états silencieux nous ont permis de les intégrer à la librairie. \\
+
+Enfin signalons que la librairie accompagnant cet article ne se targue pas de proposer tous les outils nécessaires à l'utilisation de HMMs. En effet, une multitude d'améliorations peut y être apporté. Citons notamment l'ajout d'un support pour autoriser des distributions continues pour les états ou encore l'ajout de l'algorithme EM stochastique en mémoire linéaire pour entrainer l'HMM (décrit par \cite{LM}). 
 
 \footnotesize
 \bibliographystyle{apalike}

@@ -125,6 +125,8 @@ void HiddenMarkovModel::set_name(const std::string& name) { _name = name; }
 std::size_t HiddenMarkovModel::num_states() const { return _graph.num_vertices(); }
 std::size_t HiddenMarkovModel::num_transitions() const { return _graph.num_edges(); }	
 
+Graph<State> HiddenMarkovModel::get_graph() { return _graph; }
+
 bool HiddenMarkovModel::has_state(const State& state) const {
 	return _graph.has_vertex(state);
 }
